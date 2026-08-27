@@ -1,0 +1,116 @@
+name: gym
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gym-postgres
+    environment:
+      POSTGRES_DB: gymdb
+      POSTGRES_USER: gym
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gym_dev_password}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      # 5434 ở host vì máy dev đã có PostgreSQL 16 và 17 cài sẵn chiếm 5432 và 5433.
+      # Bên trong mạng docker các service vẫn gọi postgres:5432 như bình thường.
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym -d gymdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  redis:
+    image: redis:7-alpine
+    container_name: gym-redis
+    command: redis-server --save 60 1 --maxmemory 200mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  minio:
+    image: minio/minio:latest
+    container_name: gym-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-gymadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-gym_dev_password}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # Chỉ bật khi làm Knowledge Graph:  docker compose --profile ai up
+  neo4j:
+    image: neo4j:5-community
+    container_name: gym-neo4j
+    profiles: ["ai"]
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-gym_dev_password}
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512m
+    ports:
+      - "7474:7474"   # Web console
+      - "7687:7687"   # Bolt
+    volumes:
+      - neo4jdata:/data
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  # Chỉ bật khi muốn chạy backend trong container:  docker compose --profile full up
+  backend:
+    build: ./backend
+    container_name: gym-backend
+    profiles: ["full"]
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/gymdb
+      DB_USERNAME: gym
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gym_dev_password}
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER:-gymadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-gym_dev_password}
+      JWT_SECRET: ${JWT_SECRET:-doi-chuoi-nay-truoc-khi-trien-khai-that-toi-thieu-32-ky-tu}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  neo4jdata:

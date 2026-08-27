@@ -1,0 +1,36 @@
+# Java / Maven
+target/
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Node (web, mobile)
+node_modules/
+dist/
+build/
+.expo/
+
+# Python (ai-service)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Môi trường — KHÔNG commit
+.env
+.env.local
+*.local
+
+# Log và file tạm
+*.log
+logs/
+.DS_Store
+Thumbs.db
