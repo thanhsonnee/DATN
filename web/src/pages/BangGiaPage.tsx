@@ -34,7 +34,7 @@ export function BangGiaPage() {
       {
         onSuccess: (hopDong) => {
           setDangChon(null)
-          setKetQua(`Đã tạo hợp đồng ${hopDong.registrationCode}. Vui lòng thanh toán tại quầy để kích hoạt.`)
+          setKetQua(`Đã tạo hợp đồng ${hopDong.registrationCode}. Vui lòng thanh toán để kích hoạt gói tập.`)
         },
       },
     )

@@ -46,7 +46,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-  if (res.status === 204) return undefined as T
+  if (res.status === 204) return null as T
 
   if (!res.ok) {
     // 401 nghĩa là chưa đăng nhập hoặc token hết hạn — đưa về trang đăng nhập.

@@ -102,6 +102,13 @@ function CaLamViec() {
   const [lyDoLech, setLyDoLech] = useState('')
   const [moHopThoaiDong, setMoHopThoaiDong] = useState(false)
 
+  const moModalDong = () => {
+    dongCa.reset()
+    setTienDemDuoc(String(ca?.expectedCash ?? ca?.openingBalance ?? 0))
+    setLyDoLech('')
+    setMoHopThoaiDong(true)
+  }
+
   if (!ca) {
     return (
       <Card>
@@ -122,6 +129,8 @@ function CaLamViec() {
     )
   }
 
+  const tienMatThu = (ca.expectedCash ?? ca.openingBalance) - ca.openingBalance
+
   return (
     <>
       <Card>
@@ -137,8 +146,16 @@ function CaLamViec() {
               <dt className="text-slate-500">Tiền mặt đầu ca</dt>
               <dd className="font-medium">{tien(ca.openingBalance)}</dd>
             </div>
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Tiền mặt thu trong ca</dt>
+              <dd className="font-medium text-emerald-700">+{tien(tienMatThu)}</dd>
+            </div>
+            <div className="flex justify-between border-t border-slate-100 pt-1">
+              <dt className="font-semibold text-slate-700">Tổng tiền mặt theo sổ</dt>
+              <dd className="font-bold text-slate-900">{tien(ca.expectedCash ?? ca.openingBalance)}</dd>
+            </div>
           </dl>
-          <Button variant="secondary" onClick={() => setMoHopThoaiDong(true)}>
+          <Button variant="secondary" onClick={moModalDong}>
             Đóng ca và đối soát
           </Button>
         </CardBody>
@@ -147,12 +164,26 @@ function CaLamViec() {
       <Modal open={moHopThoaiDong} title="Đóng ca và đối soát tiền mặt"
              onClose={() => setMoHopThoaiDong(false)}>
         <div className="space-y-4">
+          <div className="rounded-lg bg-slate-50 p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>Tiền mặt đầu ca:</span>
+              <span>{tien(ca.openingBalance)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Tiền mặt thu trong ca:</span>
+              <span className="text-emerald-700 font-medium">+{tien(tienMatThu)}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold text-slate-900">
+              <span>Tổng tiền mặt hệ thống tính (theo sổ):</span>
+              <span className="text-blue-700">{tien(ca.expectedCash ?? ca.openingBalance)}</span>
+            </div>
+          </div>
+
           <Alert tone="info">
-            Đếm toàn bộ tiền mặt trong két rồi nhập vào đây. Hệ thống so với số theo sổ —
-            lệch nhau thì <b>bắt buộc ghi lý do</b>.
+            Hệ thống đã tính sẵn số tiền theo sổ sách bên trên. Lễ tân chỉ cần đếm lại két tiền ngoài đời thực: nếu khớp thì giữ nguyên bấm <b>Chốt ca</b>; nếu thiếu/thừa thì sửa lại số tiền và ghi lý do.
           </Alert>
 
-          <Input label="Tiền mặt đếm được" type="number" value={tienDemDuoc}
+          <Input label="Tiền mặt đếm được thực tế trong két" type="number" value={tienDemDuoc}
                  onChange={(e) => setTienDemDuoc(e.target.value)} autoFocus />
 
           <Input label="Lý do nếu lệch" value={lyDoLech}

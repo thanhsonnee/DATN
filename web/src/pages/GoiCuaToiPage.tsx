@@ -111,7 +111,7 @@ function TheHopDong({ hopDong, onXinBaoLuu }: {
 
         {hopDong.status === 'PENDING_PAYMENT' && (
           <Alert tone="info">
-            Vui lòng thanh toán tại quầy. Lễ tân kích hoạt xong thì gói mới bắt đầu tính ngày.
+            Vui lòng thanh toán. Lễ tân kích hoạt xong thì gói mới bắt đầu tính ngày.
           </Alert>
         )}
 
