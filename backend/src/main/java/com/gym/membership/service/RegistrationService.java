@@ -43,6 +43,7 @@ public class RegistrationService {
     private final CodeGenerator codeGenerator;
     private final SessionCreditLedgerService soCai;
     private final org.springframework.beans.factory.ObjectProvider<com.gym.billing.service.BillingService> billingServiceProvider;
+    private final org.springframework.beans.factory.ObjectProvider<com.gym.sales.service.LeadService> leadServiceProvider;
 
     // ------------------------------------------------------------- chốt mua
 
@@ -123,6 +124,9 @@ public class RegistrationService {
         r = registrationRepo.save(r);
         log.info("Hợp đồng mới: {} - hội viên {} - gói {} - {} đ",
                 r.getRegistrationCode(), member.getMemberCode(), pkg.getCode(), r.getFinalPrice());
+
+        // Phân đoạn F: Tự động cập nhật phễu lead sang WON khi khách chốt hợp đồng
+        leadServiceProvider.ifAvailable(ls -> ls.markWonByPersonId(person.getId()));
 
         return RegistrationResponse.from(r);
     }
@@ -215,6 +219,9 @@ public class RegistrationService {
         r = registrationRepo.save(r);
         log.info("Hợp đồng đăng ký tại quầy: {} - hội viên {} - gói {} - {} đ",
                 r.getRegistrationCode(), member.getMemberCode(), pkg.getCode(), r.getFinalPrice());
+
+        // Phân đoạn F: Tự động cập nhật phễu lead sang WON khi khách chốt hợp đồng
+        leadServiceProvider.ifAvailable(ls -> ls.markWonByPersonId(person.getId()));
 
         if (req.payNow()) {
             com.gym.billing.domain.PaymentMethod method = req.paymentMethod() != null

@@ -13,6 +13,7 @@ interface MucMenu {
 const MENU: MucMenu[] = [
   { to: '/goi-cua-toi', nhan: 'Gói của tôi' },
   { to: '/buoi-tap', nhan: 'Buổi tập' },
+  { to: '/ban-hang', nhan: 'Bán hàng (CRM)', vaiTro: ['SALE', 'RECEPTIONIST', 'ADMIN'] },
   { to: '/lich-day', nhan: 'Lịch dạy', vaiTro: ['TRAINER', 'ADMIN'] },
   { to: '/quay', nhan: 'Màn hình quầy', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
   { to: '/thu-ngan', nhan: 'Thu ngân', vaiTro: ['RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'] },

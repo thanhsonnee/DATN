@@ -381,14 +381,14 @@ class ThanhToanVaCheckInTest {
     }
 
     @Test
-    @DisplayName("Chưa có hợp đồng nào chạy thì bị chặn vì hết hạn")
+    @DisplayName("Chưa có hợp đồng nào chạy thì bị chặn vì chưa thanh toán")
     void chuaCoHopDongThiChan() {
         given().contentType(ContentType.JSON).header(auth(tokenLeTan))
                 .body(Map.of("memberId", memberId))
                 .when().post("/check-ins")
                 .then().statusCode(200)
-                .body("result", equalTo("DENIED_EXPIRED"))
-                .body("thongBao", containsString("gia hạn"));
+                .body("result", equalTo("DENIED_UNPAID"))
+                .body("thongBao", containsString("thu tiền"));
     }
 
     @Test
@@ -426,7 +426,7 @@ class ThanhToanVaCheckInTest {
 
         given().header(auth(tokenKeToan)).when().get("/check-ins/stats?days=1")
                 .then().statusCode(200)
-                .body("DENIED_EXPIRED", equalTo(3));
+                .body("DENIED_UNPAID", equalTo(3));
     }
 
     @Test

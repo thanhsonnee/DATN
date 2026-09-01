@@ -15,6 +15,7 @@ import { LichDayPage } from '@/pages/LichDayPage'
 import { ManHinhQuayPage } from '@/pages/ManHinhQuayPage'
 import { ThuNganPage } from '@/pages/ThuNganPage'
 import { ThongKePage } from '@/pages/ThongKePage'
+import { BanHangPage } from '@/pages/BanHangPage'
 
 export default function App() {
   const { user, loading, restore } = useAuth()
@@ -42,6 +43,8 @@ export default function App() {
         <Route path="/buoi-tap" element={canDangNhap(<BuoiTapPage />)} />
         <Route path="/tai-khoan" element={canDangNhap(<TaiKhoanPage />)} />
 
+        <Route path="/ban-hang"
+               element={canQuyen(<BanHangPage />, ['SALE', 'RECEPTIONIST', 'ADMIN'])} />
         <Route path="/lich-day"
                element={canQuyen(<LichDayPage />, ['TRAINER', 'ADMIN'])} />
         <Route path="/quay"

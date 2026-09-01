@@ -275,3 +275,50 @@ export interface ProfitLossReport {
   expensesByCategory: Record<string, number>
 }
 
+// ------------------------------------------------------------ Bán hàng & CRM (Phân đoạn F)
+
+export type LeadSource = 'WALK_IN' | 'HOTLINE' | 'WEB_FORM' | 'REFERRAL' | 'APP_SELF'
+
+export type LeadStage = 'NEW' | 'CONTACTED' | 'TRIAL_BOOKED' | 'TRIAL_DONE' | 'WON' | 'LOST'
+
+export type LostReason = 'PRICE' | 'LOCATION' | 'COMPETITOR' | 'NOT_READY' | 'NO_RESPONSE'
+
+export interface Lead {
+  id: number
+  personId: number
+  fullName: string
+  phone: string
+  email: string | null
+  source: LeadSource
+  interestedMembershipId: number | null
+  interestedMembershipName: string | null
+  interestedMembershipCode: string | null
+  interestedMembershipPrice: number | null
+  assignedToId: number | null
+  assignedToName: string | null
+  assignedToCode: string | null
+  stage: LeadStage
+  lostReason: LostReason | null
+  lastContactAt: string | null
+  lastContactNote: string | null
+  nextFollowUp: string | null
+  createdAt: string
+}
+
+export interface AppUserLead {
+  personId: number
+  fullName: string
+  phone: string
+  email: string | null
+  registeredAt: string
+  daysSinceRegistration: number
+}
+
+export interface FunnelStats {
+  totalLeads: number
+  stageCounts: Record<string, number>
+  lostReasonCounts: Record<string, number>
+  conversionRate: number
+}
+
+

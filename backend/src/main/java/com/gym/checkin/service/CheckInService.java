@@ -102,10 +102,21 @@ public class CheckInService {
         if (dangChay == null) {
             boolean dangBaoLuu = hopDongs.stream()
                     .anyMatch(r -> r.getStatus() == RegistrationStatus.FROZEN);
+            Registration choThanhToan = hopDongs.stream()
+                    .filter(r -> r.getStatus() == RegistrationStatus.PENDING_PAYMENT)
+                    .findFirst().orElse(null);
 
-            c.setResult(dangBaoLuu ? CheckInResult.DENIED_FROZEN : CheckInResult.DENIED_EXPIRED);
-            if (c.getIncidentType() == null && !dangBaoLuu) {
-                c.setIncidentType(IncidentType.EXPIRED_ATTEMPT);
+            if (dangBaoLuu) {
+                c.setResult(CheckInResult.DENIED_FROZEN);
+            } else if (choThanhToan != null) {
+                c.setResult(CheckInResult.DENIED_UNPAID);
+                c.setRegistration(choThanhToan);
+                c.setIncidentNote("Hợp đồng chưa thanh toán: " + choThanhToan.getRegistrationCode());
+            } else {
+                c.setResult(CheckInResult.DENIED_EXPIRED);
+                if (c.getIncidentType() == null) {
+                    c.setIncidentType(IncidentType.EXPIRED_ATTEMPT);
+                }
             }
             return ghiNhan(c);
         }
@@ -192,8 +203,17 @@ public class CheckInService {
         if (dangChay == null) {
             boolean dangBaoLuu = hopDongs.stream()
                     .anyMatch(r -> r.getStatus() == RegistrationStatus.FROZEN);
-            return CheckInPreviewResponse.of(m,
-                    dangBaoLuu ? CheckInResult.DENIED_FROZEN : CheckInResult.DENIED_EXPIRED, null);
+            Registration choThanhToan = hopDongs.stream()
+                    .filter(r -> r.getStatus() == RegistrationStatus.PENDING_PAYMENT)
+                    .findFirst().orElse(null);
+
+            if (dangBaoLuu) {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_FROZEN, null);
+            } else if (choThanhToan != null) {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_UNPAID, choThanhToan);
+            } else {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_EXPIRED, null);
+            }
         }
 
         boolean conNo = invoiceRepo.findByRegistrationIdAndDeletedAtIsNull(dangChay.getId())

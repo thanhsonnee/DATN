@@ -64,7 +64,7 @@ public record CheckInResponse(
             case "ALLOWED_OVERRIDE" -> "Đã cho vào dù còn nợ tiền — nhớ nhắc khách thanh toán";
             case "DENIED_EXPIRED"   -> "Gói đã hết hạn — mời khách gia hạn";
             case "DENIED_FROZEN"    -> "Gói đang bảo lưu — cần kết thúc bảo lưu trước";
-            case "DENIED_UNPAID"    -> "Còn nợ tiền — thu tiền hoặc bấm cho vào có ghi nhận";
+            case "DENIED_UNPAID"    -> "Chưa thanh toán / Chưa kích hoạt — vui lòng thu tiền trước khi vào tập";
             case "DENIED_SUSPECT"   -> "Hội viên bị hạn chế — yêu cầu xuất trình giấy tờ";
             default -> "Không xác định được, kiểm tra lại";
         };

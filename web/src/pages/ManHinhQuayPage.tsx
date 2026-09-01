@@ -69,7 +69,6 @@ export function ManHinhQuayPage() {
                   dangTai={dangXemTruoc} xemTruoc={xemTruoc}
                   dangGui={quetVao.isPending}
                   onXacNhan={() => xacNhan(false)}
-                  onVanChoVao={() => xacNhan(true)}
                 />
               )}
 
@@ -82,16 +81,7 @@ export function ManHinhQuayPage() {
           <ChoThanhToan />
 
           {ketQua && (
-            <KetQuaQuet ketQua={ketQua} onChoVaoDuNo={() => {
-              // Vẫn còn thông tin hội viên vừa quét, chỉ cần gọi lại với cờ bỏ qua
-              setDaChon({
-                memberId: ketQua.memberId, memberCode: ketQua.memberCode,
-                fullName: ketQua.memberName, phone: '', status: 'ACTIVE',
-              })
-              quetVao.mutate({ memberId: ketQua.memberId, override: true }, {
-                onSuccess: (kq) => { setKetQua(kq); setDaChon(null) },
-              })
-            }} />
+            <KetQuaQuet ketQua={ketQua} />
           )}
         </div>
 
@@ -135,19 +125,17 @@ export function ManHinhQuayPage() {
  * Lễ tân nhìn đủ vào được không, còn mấy ngày, có nợ tiền không, TRƯỚC khi
  * quyết định bấm nút nào — không phải bấm xác nhận mù rồi mới biết kết quả.
  */
-function TrangThaiTruoc({ dangTai, xemTruoc, dangGui, onXacNhan, onVanChoVao }: {
+function TrangThaiTruoc({ dangTai, xemTruoc, dangGui, onXacNhan }: {
   dangTai: boolean
   xemTruoc: CheckInPreview | undefined
   dangGui: boolean
   onXacNhan: () => void
-  onVanChoVao: () => void
 }) {
   if (dangTai || !xemTruoc) {
     return <p className="py-2 text-sm text-slate-400">Đang kiểm tra tình trạng…</p>
   }
 
   const choVao = xemTruoc.choPhepVao
-  const conNo = xemTruoc.result === 'DENIED_UNPAID'
 
   return (
     <div className={`space-y-3 rounded-lg border p-4
@@ -172,13 +160,9 @@ function TrangThaiTruoc({ dangTai, xemTruoc, dangGui, onXacNhan, onVanChoVao }: 
         <Button className="w-full" loading={dangGui} onClick={onXacNhan}>
           Xác nhận vào tập
         </Button>
-      ) : conNo ? (
-        <Button className="w-full" variant="secondary" loading={dangGui} onClick={onVanChoVao}>
-          Vẫn cho vào (ghi nhận trách nhiệm)
-        </Button>
       ) : (
-        <Button className="w-full" disabled>
-          Không thể cho vào
+        <Button className="w-full opacity-60 cursor-not-allowed" disabled>
+          Không thể cho vào (Chưa thanh toán / Không hợp lệ)
         </Button>
       )}
     </div>
@@ -186,12 +170,10 @@ function TrangThaiTruoc({ dangTai, xemTruoc, dangGui, onXacNhan, onVanChoVao }: 
 }
 
 /** Kết quả quét thật — ghi thêm thời điểm và dấu hiệu bất thường nếu có. */
-function KetQuaQuet({ ketQua, onChoVaoDuNo }: {
+function KetQuaQuet({ ketQua }: {
   ketQua: CheckInResult
-  onChoVaoDuNo: () => void
 }) {
   const choVao = ketQua.choPhepVao
-  const canhBaoNo = ketQua.result === 'DENIED_UNPAID'
 
   return (
     <Card className={choVao ? 'border-emerald-300' : 'border-red-300'}>
@@ -226,15 +208,6 @@ function KetQuaQuet({ ketQua, onChoVaoDuNo }: {
             <b>{tenSuCo(ketQua.incidentType)}</b>
             {ketQua.incidentNote && <div className="mt-1">{ketQua.incidentNote}</div>}
           </Alert>
-        )}
-
-        {/* Phòng khi tình trạng đổi ngay giữa lúc xem trước và lúc bấm xác nhận */}
-        {canhBaoNo && (
-          <div className="flex justify-end">
-            <Button variant="secondary" onClick={onChoVaoDuNo}>
-              Vẫn cho vào (ghi nhận trách nhiệm)
-            </Button>
-          </div>
         )}
       </CardBody>
     </Card>
