@@ -53,6 +53,7 @@ public class BillingService {
     private final EmployeeRepository employeeRepo;
     private final UserRepository userRepo;
     private final RegistrationService registrationService;
+    private final RevenueRecognitionService revenueRecognitionService;
     private final CodeGenerator codeGenerator;
 
     // ---------------------------------------------------------------- hóa đơn
@@ -208,6 +209,8 @@ public class BillingService {
                 log.info("Thu đủ hóa đơn {} → kích hoạt hợp đồng {}",
                         inv.getInvoiceNo(), r.getRegistrationCode());
             }
+            // E3: Tự động phân bổ doanh thu theo chuẩn kế toán dồn tích
+            revenueRecognitionService.generateSchedule(r, inv);
         } else {
             inv.setStatus(InvoiceStatus.PARTIALLY_PAID);
         }

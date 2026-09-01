@@ -43,6 +43,32 @@ export interface MuaGoiInput {
   discountReason?: string
 }
 
+export interface DeskRegisterInput {
+  fullName: string
+  phone: string
+  email?: string
+  membershipId: number
+  discountAmount?: number
+  discountReason?: string
+  assignedTrainerId?: number
+  note?: string
+  payNow: boolean
+  paymentMethod?: string
+}
+
+export function useDeskRegister() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: DeskRegisterInput) => api.post<Registration>('/registrations/desk', input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['registrations'] })
+      qc.invalidateQueries({ queryKey: ['cash-shift'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
+    },
+  })
+}
+
 export function useMuaGoi() {
   const qc = useQueryClient()
   const refreshUser = useAuth((s) => s.refreshUser)

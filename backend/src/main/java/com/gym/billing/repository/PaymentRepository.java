@@ -30,4 +30,19 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
          + "WHERE p.invoice.id = :invoiceId AND p.status = :status")
     BigDecimal tongDaThu(@Param("invoiceId") Long invoiceId, @Param("status") PaymentStatus status);
+
+    /** Tổng tiền thực thu giữa 2 mốc thời gian. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
+         + "WHERE p.status = com.gym.billing.domain.PaymentStatus.SUCCEEDED "
+         + "  AND p.paidAt >= :from AND p.paidAt <= :to")
+    BigDecimal sumCollectedBetween(@Param("from") java.time.OffsetDateTime from, @Param("to") java.time.OffsetDateTime to);
+
+    /** Tổng doanh số do nhân viên thu/chốt trong khoảng thời gian. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
+         + "WHERE p.status = com.gym.billing.domain.PaymentStatus.SUCCEEDED "
+         + "  AND p.receivedBy.id = :userId "
+         + "  AND p.paidAt >= :from AND p.paidAt <= :to")
+    BigDecimal sumCollectedByUserBetween(@Param("userId") Long userId,
+                                         @Param("from") java.time.OffsetDateTime from,
+                                         @Param("to") java.time.OffsetDateTime to);
 }

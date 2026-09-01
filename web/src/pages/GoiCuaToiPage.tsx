@@ -127,11 +127,16 @@ function TheHopDong({ hopDong, onXinBaoLuu }: {
           </div>
         )}
 
-        {dangChay && chuaTungBaoLuu && (
-          <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {(hopDong.status === 'COMPLETED' || (dangChay && conLai !== null && conLai <= 14)) && (
+            <Link to="/">
+              <Button variant="primary">Gia hạn gói tập</Button>
+            </Link>
+          )}
+          {dangChay && chuaTungBaoLuu && (
             <Button variant="secondary" onClick={onXinBaoLuu}>Xin bảo lưu</Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardBody>
     </Card>
   )

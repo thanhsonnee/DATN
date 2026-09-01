@@ -31,4 +31,14 @@ public interface PtSessionRepository extends JpaRepository<PtSession, Long> {
 
     /** Đếm buổi theo loại trong một hợp đồng — phục vụ kiểm tra hạn mức. */
     long countByRegistrationIdAndStatus(Long registrationId, SessionStatus status);
+
+    /** Đếm số buổi PT hoàn thành của HLV trong khoảng thời gian để tính hoa hồng lương. */
+    @Query("SELECT COUNT(s) FROM PtSession s "
+         + "WHERE s.trainer.id = :trainerId "
+         + "  AND s.status = com.gym.training.domain.SessionStatus.COMPLETED "
+         + "  AND s.scheduledStart >= :from AND s.scheduledStart <= :to "
+         + "  AND s.deletedAt IS NULL")
+    long countCompletedSessionsByTrainerBetween(@Param("trainerId") Long trainerId,
+                                                @Param("from") OffsetDateTime from,
+                                                @Param("to") OffsetDateTime to);
 }

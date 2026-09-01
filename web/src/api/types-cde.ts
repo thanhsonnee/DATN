@@ -170,3 +170,108 @@ export interface Trainer {
   ratingAvg: number | null
   ratingCount: number | null
 }
+
+// ------------------------------------------------------------ Tài chính nâng cao (E3, E4, E5)
+
+// E3: Doanh thu dồn tích
+export interface RevenueSchedule {
+  id: number
+  registrationId: number
+  registrationCode: string
+  memberName: string
+  scheduleDate: string
+  amount: number
+  status: 'PENDING' | 'RECOGNIZED' | 'REVERSED'
+  recognitionMethod: string
+  recognizedAt: string | null
+  note: string | null
+}
+
+export interface RevenueReport {
+  month: number
+  year: number
+  totalCashCollected: number
+  totalAccrualRecognized: number
+  totalDeferredRevenue: number
+  schedules: RevenueSchedule[]
+}
+
+// E4: Bảng lương
+export type PayrollStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED'
+
+export interface PayrollItem {
+  id: number
+  employeeId: number
+  employeeCode: string
+  employeeName: string
+  department: string
+  position: string | null
+  baseSalary: number
+  ptSessionsCount: number
+  ptCommission: number
+  salesContractsCount: number
+  salesCommission: number
+  bonusAmount: number
+  deductionAmount: number
+  netSalary: number
+  note: string | null
+}
+
+export interface PayrollRun {
+  id: number
+  payrollCode: string
+  periodMonth: number
+  periodYear: number
+  totalBaseSalary: number
+  totalCommission: number
+  totalBonus: number
+  totalDeduction: number
+  totalNetSalary: number
+  status: PayrollStatus
+  createdByName: string | null
+  approvedByName: string | null
+  approvedAt: string | null
+  paidAt: string | null
+  note: string | null
+  items: PayrollItem[]
+}
+
+// E5: Chi phí & Lợi nhuận
+export type ExpenseCategory =
+  | 'RENT'
+  | 'UTILITIES'
+  | 'EQUIPMENT_MAINTENANCE'
+  | 'SALARY'
+  | 'SUPPLIES'
+  | 'MARKETING'
+  | 'OTHER'
+
+export interface Expense {
+  id: number
+  expenseNo: string
+  category: ExpenseCategory
+  title: string
+  amount: number
+  spentAt: string
+  spentByName: string | null
+  approvedByName: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  paymentMethod: PaymentMethod
+  receiptUrl: string | null
+  note: string | null
+  createdAt: string
+}
+
+export interface ProfitLossReport {
+  month: number
+  year: number
+  cashRevenue: number
+  accrualRevenue: number
+  operatingExpenses: number
+  salaryExpenses: number
+  totalExpenses: number
+  netProfitCashBasis: number
+  netProfitAccrualBasis: number
+  expensesByCategory: Record<string, number>
+}
+

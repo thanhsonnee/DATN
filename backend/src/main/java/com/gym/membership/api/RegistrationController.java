@@ -32,6 +32,15 @@ public class RegistrationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(registrationService.create(userId, req));
     }
 
+    @Operation(summary = "Đăng ký gói tập tại quầy (A1 + A2 Kênh 1)",
+            description = "Lễ tân/Sale tạo hồ sơ và hợp đồng trực tiếp cho khách vãng lai tại quầy.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','SALE','ADMIN')")
+    @PostMapping("/desk")
+    public ResponseEntity<RegistrationResponse> createAtDesk(@AuthenticationPrincipal Long userId,
+                                                             @Valid @RequestBody DeskRegistrationRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(registrationService.createAtDesk(userId, req));
+    }
+
     @Operation(summary = "Hợp đồng của tôi")
     @GetMapping("/me")
     public List<RegistrationResponse> myRegistrations(@AuthenticationPrincipal Long userId) {
@@ -100,6 +109,15 @@ public class RegistrationController {
     @GetMapping("/expiring")
     public List<RegistrationResponse> expiring(@RequestParam(defaultValue = "14") int days) {
         return registrationService.expiringWithin(days);
+    }
+
+    @Operation(summary = "Quét xử lý hợp đồng hết hạn (A5)",
+            description = "Chuyển các hợp đồng ACTIVE có endDate < hôm nay sang COMPLETED và thu hồi buổi PT còn dư.")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST','SALE')")
+    @PostMapping("/process-expired")
+    public ResponseEntity<String> processExpired() {
+        int count = registrationService.xuLyHetHan();
+        return ResponseEntity.ok("Đã xử lý " + count + " hợp đồng hết hạn");
     }
 
     public record FreezeDecision(boolean approved, @Size(max = 255) String reason) {}

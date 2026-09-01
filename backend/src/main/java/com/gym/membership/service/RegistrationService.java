@@ -42,6 +42,7 @@ public class RegistrationService {
     private final MembershipService membershipService;
     private final CodeGenerator codeGenerator;
     private final SessionCreditLedgerService soCai;
+    private final org.springframework.beans.factory.ObjectProvider<com.gym.billing.service.BillingService> billingServiceProvider;
 
     // ------------------------------------------------------------- chốt mua
 
@@ -122,6 +123,108 @@ public class RegistrationService {
         r = registrationRepo.save(r);
         log.info("Hợp đồng mới: {} - hội viên {} - gói {} - {} đ",
                 r.getRegistrationCode(), member.getMemberCode(), pkg.getCode(), r.getFinalPrice());
+
+        return RegistrationResponse.from(r);
+    }
+
+    /**
+     * Đăng ký gói tập tại quầy cho khách vãng lai (A1 + A2 Kênh 1).
+     *
+     * <p>Tự động tạo hồ sơ con người và hội viên nếu chưa có, lập hợp đồng và có thể
+     * thu tiền kích hoạt ngay tại quầy nếu {@code req.payNow() == true}.
+     */
+    @Transactional
+    public RegistrationResponse createAtDesk(Long actorUserId, DeskRegistrationRequest req) {
+        // Tìm hoặc tạo Person
+        Person person = personRepo.findByPhoneAndDeletedAtIsNull(req.phone().trim())
+                .orElseGet(() -> {
+                    Person p = new Person();
+                    p.setFullName(req.fullName().trim());
+                    p.setPhone(req.phone().trim());
+                    if (req.email() != null && !req.email().isBlank()) {
+                        p.setEmail(req.email().trim());
+                    }
+                    return personRepo.save(p);
+                });
+
+        // Tìm hoặc tạo Member
+        Member member = memberRepo.findByPersonIdAndDeletedAtIsNull(person.getId())
+                .orElseGet(() -> {
+                    Member m = new Member();
+                    m.setPerson(person);
+                    m.setMemberCode(codeGenerator.nextMemberCode());
+                    m.setJoinDate(LocalDate.now());
+                    m.setStatus(MemberStatus.ACTIVE);
+                    m.setSource(MemberSource.WALK_IN);
+                    m = memberRepo.save(m);
+                    log.info("Hội viên mới tại quầy: {} - {}", m.getMemberCode(), person.getFullName());
+                    return m;
+                });
+
+        Membership pkg = membershipService.require(req.membershipId());
+        if (pkg.getStatus() != MembershipStatus.ACTIVE) {
+            throw ApiException.badRequest("PACKAGE_NOT_ON_SALE", "Gói tập này đã ngừng bán");
+        }
+        if (member.getStatus() == MemberStatus.BLACKLISTED) {
+            throw ApiException.forbidden("MEMBER_BLACKLISTED",
+                    "Hội viên đang trong danh sách hạn chế, không thể mua gói");
+        }
+
+        BigDecimal discount = (req.discountAmount() == null ? BigDecimal.ZERO : req.discountAmount())
+                .setScale(2, RoundingMode.HALF_UP);
+        if (discount.compareTo(BigDecimal.ZERO) > 0
+                && (req.discountReason() == null || req.discountReason().isBlank())) {
+            throw ApiException.badRequest("DISCOUNT_REASON_REQUIRED",
+                    "Có giảm giá thì bắt buộc ghi tên chương trình khuyến mãi");
+        }
+        if (discount.compareTo(pkg.getPrice()) > 0) {
+            throw ApiException.badRequest("DISCOUNT_TOO_LARGE",
+                    "Số tiền giảm không được vượt quá giá gói");
+        }
+
+        Registration r = new Registration();
+        r.setRegistrationCode(codeGenerator.nextRegistrationCode());
+        r.setMember(member);
+        r.setMembership(pkg);
+        r.setPackageType(pkg.getPackageType());
+        r.setDurationDays(pkg.getDurationDays());
+        r.setSessionsTotal(pkg.getSessionCount());
+        r.setListPrice(pkg.getPrice());
+        r.setDiscountAmount(discount);
+        r.setDiscountReason(discount.compareTo(BigDecimal.ZERO) > 0 ? req.discountReason() : null);
+        r.setFinalPrice(pkg.getPrice().subtract(discount));
+        r.setContractDate(LocalDate.now());
+        r.setStatus(RegistrationStatus.PENDING_PAYMENT);
+        r.setNote(req.note());
+
+        if (req.assignedTrainerId() != null) {
+            Employee trainer = employeeRepo.findById(req.assignedTrainerId())
+                    .orElseThrow(() -> ApiException.notFound("Không tìm thấy huấn luyện viên"));
+            if (!trainer.isTrainer()) {
+                throw ApiException.badRequest("NOT_A_TRAINER", "Nhân viên được chọn không phải huấn luyện viên");
+            }
+            r.setAssignedTrainer(trainer);
+        }
+
+        User actor = userRepo.findById(actorUserId).orElse(null);
+        if (actor != null && actor.getPrimaryRole() != UserRole.MEMBER) {
+            employeeRepo.findByPersonIdAndDeletedAtIsNull(actor.getPerson().getId())
+                    .ifPresent(r::setSoldBy);
+        }
+
+        r = registrationRepo.save(r);
+        log.info("Hợp đồng đăng ký tại quầy: {} - hội viên {} - gói {} - {} đ",
+                r.getRegistrationCode(), member.getMemberCode(), pkg.getCode(), r.getFinalPrice());
+
+        if (req.payNow()) {
+            com.gym.billing.domain.PaymentMethod method = req.paymentMethod() != null
+                    ? req.paymentMethod()
+                    : com.gym.billing.domain.PaymentMethod.CASH;
+            com.gym.billing.service.BillingService billing = billingServiceProvider.getIfAvailable();
+            if (billing != null) {
+                return billing.xacNhanGoiTap(r.getId(), actorUserId, method);
+            }
+        }
 
         return RegistrationResponse.from(r);
     }
@@ -324,6 +427,57 @@ public class RegistrationService {
         LocalDate today = LocalDate.now();
         return registrationRepo.findExpiringBetween(today, today.plusDays(days))
                 .stream().map(RegistrationResponse::from).toList();
+    }
+
+    /**
+     * Tự động xử lý hết hạn cho các hợp đồng đã qua ngày kết thúc (A5).
+     *
+     * <p>Chuyển trạng thái ACTIVE → COMPLETED, thu hồi các buổi tập PT chưa dùng vào sổ cái.
+     */
+    @Transactional
+    public int xuLyHetHan() {
+        LocalDate today = LocalDate.now();
+        List<Registration> expiredList = registrationRepo
+                .findByStatusAndDeletedAtIsNullAndEndDateBefore(RegistrationStatus.ACTIVE, today);
+
+        for (Registration r : expiredList) {
+            r.setStatus(RegistrationStatus.COMPLETED);
+            r.setClosedAt(OffsetDateTime.now());
+            r.setCloseReason("EXPIRED");
+
+            // Thu hồi số buổi còn dư trong sổ cái tín dụng
+            try {
+                soCai.thuHoiBuoiHetHan(r);
+            } catch (Exception ex) {
+                log.error("Lỗi khi thu hồi buổi hết hạn cho hợp đồng {}: {}", r.getRegistrationCode(), ex.getMessage());
+            }
+
+            registrationRepo.save(r);
+            log.info("Hợp đồng {} hết hạn: kết thúc vào ngày {}, đã chuyển trạng thái COMPLETED",
+                    r.getRegistrationCode(), r.getEndDate());
+        }
+
+        return expiredList.size();
+    }
+
+    /**
+     * Tự động hủy các hợp đồng PENDING_PAYMENT bị bỏ ngang quá 48 giờ (A2).
+     */
+    @Transactional
+    public int huyHopDongBoNgang() {
+        LocalDate hanCuoi = LocalDate.now().minusDays(2);
+        List<Registration> list = registrationRepo
+                .findByStatusAndDeletedAtIsNullAndContractDateBefore(RegistrationStatus.PENDING_PAYMENT, hanCuoi);
+
+        for (Registration r : list) {
+            r.setStatus(RegistrationStatus.CANCELLED);
+            r.setClosedAt(OffsetDateTime.now());
+            r.setCloseReason("UNPAID_TIMEOUT_48H");
+            registrationRepo.save(r);
+            log.info("Hợp đồng {} bị hủy tự động do quá 48h chưa thanh toán", r.getRegistrationCode());
+        }
+
+        return list.size();
     }
 
     // ---------------------------------------------------------------- riêng tư
