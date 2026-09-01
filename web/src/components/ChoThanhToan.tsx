@@ -32,7 +32,7 @@ export function ChoThanhToan() {
   return (
     <Card>
       <CardHeader title="Chờ xác nhận"
-                  subtitle="Hội viên vừa đăng ký gói, đang chờ ra quầy trả tiền"
+                  subtitle="Hội viên vừa đăng ký gói, đang chờ thanh toán"
                   action={<Badge tone="amber">{dsChoThanhToan?.length ?? 0}</Badge>} />
       <CardBody className="p-0">
         {isLoading ? (

@@ -385,7 +385,23 @@ public class BillingService {
     public CashShiftResponse caHienTai(Long actorUserId) {
         Employee nv = nhanVienCuaTaiKhoan(actorUserId);
         return shiftRepo.findByEmployeeIdAndStatus(nv.getId(), CashShiftStatus.OPEN)
-                .map(CashShiftResponse::from).orElse(null);
+                .map(ca -> {
+                    BigDecimal thuTrongCa = paymentRepo.tongTienMatTrongCa(ca.getId());
+                    BigDecimal expected = ca.getOpeningBalance().add(thuTrongCa).setScale(2, RoundingMode.HALF_UP);
+                    return new CashShiftResponse(
+                            ca.getId(),
+                            ca.getEmployee().getId(),
+                            ca.getEmployee().getPerson().getFullName(),
+                            ca.getOpenedAt(),
+                            ca.getClosedAt(),
+                            ca.getOpeningBalance(),
+                            expected,
+                            ca.getCountedCash(),
+                            ca.getDifference(),
+                            ca.getDifferenceReason(),
+                            ca.getStatus().name()
+                    );
+                }).orElse(null);
     }
 
     // ---------------------------------------------------------------- riêng tư

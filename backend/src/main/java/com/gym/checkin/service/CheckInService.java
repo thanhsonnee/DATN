@@ -93,8 +93,10 @@ public class CheckInService {
         List<Registration> hopDongs =
                 registrationRepo.findByMemberIdAndDeletedAtIsNullOrderByContractDateDesc(m.getId());
 
+        LocalDate homNay = LocalDate.now();
         Registration dangChay = hopDongs.stream()
-                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE)
+                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE
+                          && (r.getEndDate() == null || !r.getEndDate().isBefore(homNay)))
                 .findFirst().orElse(null);
 
         if (dangChay == null) {
@@ -181,8 +183,10 @@ public class CheckInService {
 
         List<Registration> hopDongs =
                 registrationRepo.findByMemberIdAndDeletedAtIsNullOrderByContractDateDesc(m.getId());
+        LocalDate homNay = LocalDate.now();
         Registration dangChay = hopDongs.stream()
-                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE)
+                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE
+                          && (r.getEndDate() == null || !r.getEndDate().isBefore(homNay)))
                 .findFirst().orElse(null);
 
         if (dangChay == null) {

@@ -41,6 +41,7 @@ function useLamMoiBilling() {
     qc.invalidateQueries({ queryKey: ['invoices'] })
     qc.invalidateQueries({ queryKey: ['payments'] })
     qc.invalidateQueries({ queryKey: ['cash-shift'] })
+    qc.refetchQueries({ queryKey: ['cash-shift', 'current'] })
     // Thu đủ tiền thì hợp đồng kích hoạt và sổ cái được cấp buổi
     qc.invalidateQueries({ queryKey: ['registrations'] })
     qc.invalidateQueries({ queryKey: ['registrations', 'pending-payment'] })

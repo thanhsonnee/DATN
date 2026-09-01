@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: gymdb
       POSTGRES_USER: gym
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gym_dev_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123}
       TZ: Asia/Ho_Chi_Minh
     ports:
       # 5434 ở host vì máy dev đã có PostgreSQL 16 và 17 cài sẵn chiếm 5432 và 5433.
