@@ -11,6 +11,21 @@ export function ngay(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`
 }
 
+/**
+ * Lùi lại N ngày từ một mốc ISO — dùng để suy ra ngày hết hạn CŨ từ ngày hết
+ * hạn mới + số ngày bảo lưu. Đọc/ghi bằng getter local (getFullYear/getMonth/
+ * getDate), KHÔNG dùng toISOString() — hàm đó quy đổi sang UTC nên ở múi giờ
+ * +7 sẽ lùi lố thêm 1 ngày (00:00 giờ VN = 17:00 hôm trước theo UTC).
+ */
+export function truNgay(iso: string, soNgay: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() - soNgay)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Số ngày còn lại tính tới ngày hết hạn. Âm nghĩa là đã quá hạn. */
 export function soNgayConLai(endDate: string | null): number | null {
   if (!endDate) return null

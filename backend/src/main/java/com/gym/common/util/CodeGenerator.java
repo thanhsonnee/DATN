@@ -44,6 +44,24 @@ public class CodeGenerator {
         return String.format("PAY-%d-%06d", LocalDate.now().getYear(), nextVal("payment_no_seq"));
     }
 
+    /** Ví dụ: {@code EXP-2026-000001} — mã chi phí. */
+    @Transactional
+    public String nextExpenseNo() {
+        return String.format("EXP-%d-%06d", LocalDate.now().getYear(), nextVal("expense_no_seq"));
+    }
+
+    /** Ví dụ: {@code PAYROLL-2026-08-001} — mã bảng lương. */
+    @Transactional
+    public String nextPayrollCode(int year, int month) {
+        return String.format("PAYROLL-%d-%02d-%03d", year, month, nextVal("payroll_code_seq"));
+    }
+
+    /** Ví dụ: {@code EM-100} — mã in trên thẻ nhân viên, sinh khi Admin tạo tài khoản. */
+    @Transactional
+    public String nextEmployeeCode() {
+        return String.format("EM-%03d", nextVal("employee_code_seq"));
+    }
+
     private long nextVal(String sequenceName) {
         return ((Number) em.createNativeQuery("SELECT nextval('" + sequenceName + "')")
                 .getSingleResult()).longValue();

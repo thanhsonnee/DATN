@@ -90,11 +90,43 @@ export function tenKetQuaCheckIn(result: string): string {
     ALLOWED_OVERRIDE: 'Cho vào dù còn nợ',
     DENIED_EXPIRED: 'Chặn — hết hạn',
     DENIED_FROZEN: 'Chặn — đang bảo lưu',
-    DENIED_UNPAID: 'Chặn — còn nợ tiền',
+    DENIED_UNPAID: 'Chặn — chưa thanh toán/kích hoạt',
     DENIED_NOT_FOUND: 'Chặn — không tìm thấy',
     DENIED_SUSPECT: 'Chặn — nghi vấn',
   }
   return map[result] ?? result
+}
+
+export function tenLoaiPhanHoi(type: string): string {
+  const map: Record<string, string> = {
+    TRAINER: 'Đánh giá huấn luyện viên',
+    FACILITY: 'Báo hỏng thiết bị',
+    HYGIENE: 'Vệ sinh',
+    SERVICE: 'Chất lượng dịch vụ',
+    GENERAL: 'Góp ý chung',
+  }
+  return map[type] ?? type
+}
+
+export function tenTrangThaiPhanHoi(status: string): string {
+  const map: Record<string, string> = {
+    OPEN: 'Mới gửi',
+    IN_PROGRESS: 'Đang xử lý',
+    WAITING_PARTS: 'Chờ linh kiện',
+    RESOLVED: 'Đã xử lý xong',
+    CLOSED: 'Đã đóng',
+  }
+  return map[status] ?? status
+}
+
+export function tenTrangThaiThietBi(status: string): string {
+  const map: Record<string, string> = {
+    ACTIVE: 'Hoạt động tốt',
+    NEEDS_REPAIR: 'Cần sửa',
+    UNDER_REPAIR: 'Đang sửa',
+    RETIRED: 'Ngừng sử dụng',
+  }
+  return map[status] ?? status
 }
 
 export function tenSuCo(type: string | null): string | null {

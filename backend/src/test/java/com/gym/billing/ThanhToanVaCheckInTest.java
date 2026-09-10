@@ -147,6 +147,15 @@ class ThanhToanVaCheckInTest {
     }
 
     @Test
+    @DisplayName("Hợp đồng vừa chốt mua hiện NGAY trong Công nợ, không cần chờ lễ tân xác nhận")
+    void hopDongMoiHienNgayTrongCongNo() {
+        given().header(auth(tokenLeTan)).when().get("/billing/invoices/unpaid")
+                .then().statusCode(200)
+                .body("registrationId", hasItem(registrationId))
+                .body("find { it.registrationId == " + registrationId + " }.status", equalTo("UNPAID"));
+    }
+
+    @Test
     @DisplayName("Mỗi hợp đồng chỉ xuất được một hóa đơn")
     void moiHopDongMotHoaDon() {
         xuatHoaDon();
@@ -381,14 +390,14 @@ class ThanhToanVaCheckInTest {
     }
 
     @Test
-    @DisplayName("Chưa có hợp đồng nào chạy thì bị chặn vì hết hạn")
+    @DisplayName("Chưa có hợp đồng nào chạy thì bị chặn vì chưa thanh toán")
     void chuaCoHopDongThiChan() {
         given().contentType(ContentType.JSON).header(auth(tokenLeTan))
                 .body(Map.of("memberId", memberId))
                 .when().post("/check-ins")
                 .then().statusCode(200)
-                .body("result", equalTo("DENIED_EXPIRED"))
-                .body("thongBao", containsString("gia hạn"));
+                .body("result", equalTo("DENIED_UNPAID"))
+                .body("thongBao", containsString("thu tiền"));
     }
 
     @Test
@@ -426,7 +435,7 @@ class ThanhToanVaCheckInTest {
 
         given().header(auth(tokenKeToan)).when().get("/check-ins/stats?days=1")
                 .then().statusCode(200)
-                .body("DENIED_EXPIRED", equalTo(3));
+                .body("DENIED_UNPAID", equalTo(3));
     }
 
     @Test
@@ -446,11 +455,13 @@ class ThanhToanVaCheckInTest {
                 .when().post("/billing/cash-shifts/open").then().statusCode(201);
     }
 
+    /**
+     * Hóa đơn giờ được xuất NGAY lúc lập hợp đồng (xem RegistrationService),
+     * không còn chờ tới lúc gọi endpoint này — nên chỉ cần lấy lại id đã có sẵn.
+     */
     private int xuatHoaDon() {
-        return given().contentType(ContentType.JSON).header(auth(tokenLeTan))
-                .body(Map.of("registrationId", registrationId))
-                .when().post("/billing/invoices").then().statusCode(201)
-                .extract().path("id");
+        return jdbc.queryForObject(
+                "SELECT id FROM invoices WHERE registration_id = ?", Integer.class, registrationId);
     }
 
     private int thuTien(int invoiceId, int soTien, String hinhThuc) {

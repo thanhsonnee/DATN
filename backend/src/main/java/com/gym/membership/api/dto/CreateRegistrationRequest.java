@@ -29,5 +29,8 @@ public record CreateRegistrationRequest(
         Long assignedTrainerId,
 
         @Size(max = 1000)
-        String note
+        String note,
+
+        /** Hợp đồng đang gia hạn tiếp nối — bỏ trống nếu đây là gói hoàn toàn mới, không nối vào đâu cả. */
+        Long renewFromRegistrationId
 ) {}

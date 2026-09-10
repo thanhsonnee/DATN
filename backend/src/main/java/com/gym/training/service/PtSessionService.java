@@ -8,6 +8,7 @@ import com.gym.identity.repository.UserRepository;
 import com.gym.membership.domain.Registration;
 import com.gym.membership.domain.RegistrationStatus;
 import com.gym.membership.repository.RegistrationRepository;
+import com.gym.settings.service.SystemSettingService;
 import com.gym.training.domain.*;
 import com.gym.training.api.dto.PtSessionResponse;
 import com.gym.training.repository.PtSessionRepository;
@@ -43,9 +44,6 @@ public class PtSessionService {
     // khi còn trong giao dịch. Dựng DTO ở controller sẽ gặp lỗi vì lúc đó giao dịch
     // đã đóng — và controller cũng không nên biết tới entity.
 
-    /** Hủy sát giờ hơn ngần này thì mất buổi. Sẽ chuyển sang system_settings. */
-    private static final int GIO_HUY_MUON = 4;
-
     /** Hội viên không xác nhận quá ngần này giờ thì hệ thống tự duyệt. */
     private static final int GIO_TU_DUYET = 24;
 
@@ -55,6 +53,7 @@ public class PtSessionService {
     private final EmployeeRepository employeeRepo;
     private final UserRepository userRepo;
     private final SessionCreditLedgerService soCai;
+    private final SystemSettingService settings;
 
     // ------------------------------------------------------------- đặt lịch
 
@@ -97,6 +96,16 @@ public class PtSessionService {
                     "Huấn luyện viên hiện không nhận lịch");
         }
 
+        // Chỉ chặn nếu trùng giờ với buổi ĐÃ CHỐT (SCHEDULED) — biết chắc sẽ không
+        // bao giờ duyệt được nên từ chối ngay, đỡ hội viên chờ rồi mới biết. Trùng
+        // với buổi khác còn PENDING_TRAINER (chưa ai chốt) thì vẫn cho đặt, để
+        // huấn luyện viên tự chọn duyệt ai — bên thua sẽ tự động bị từ chối ở
+        // duyetLich() khi bên kia được chốt trước.
+        if (trungLichDaChot(trainerId, batDau, ketThuc, null)) {
+            throw ApiException.conflict("TRAINER_TIME_CONFLICT",
+                    "Huấn luyện viên đã có lịch dạy khác trong khung giờ này, vui lòng chọn giờ khác");
+        }
+
         // Báo sớm nếu hết buổi, nhưng CHƯA trừ — chỉ trừ khi buổi hoàn thành
         SessionType loai = loaiBuoi == null ? SessionType.PAID_PT : loaiBuoi;
         if (loai == SessionType.PAID_PT && soCai.soDuHienTai(registrationId) <= 0) {
@@ -121,7 +130,14 @@ public class PtSessionService {
         return PtSessionResponse.from(s);
     }
 
-    /** Huấn luyện viên duyệt yêu cầu đặt lịch. */
+    /**
+     * Huấn luyện viên duyệt yêu cầu đặt lịch.
+     *
+     * <p>Buổi này vừa "chốt" xong thì mọi yêu cầu KHÁC của cùng huấn luyện viên,
+     * còn đang chờ duyệt (PENDING_TRAINER), mà trùng giờ với buổi vừa chốt — chắc
+     * chắn sẽ không bao giờ duyệt được nữa, nên tự động chuyển sang từ chối luôn
+     * thay vì để hội viên chờ vô vọng rồi huấn luyện viên mới tự tay từ chối.
+     */
     @Transactional
     public PtSessionResponse duyetLich(Long sessionId) {
         PtSession s = require(sessionId);
@@ -129,6 +145,9 @@ public class PtSessionService {
 
         s.setStatus(SessionStatus.SCHEDULED);
         s.setRespondedAt(OffsetDateTime.now());
+
+        tuChoiCacBuoiTrungLich(s);
+
         return PtSessionResponse.from(s);
     }
 
@@ -266,8 +285,9 @@ public class PtSessionService {
                     "Buổi tập đang ở trạng thái " + s.getStatus() + ", không hủy được");
         }
 
+        int gioHuyMuon = settings.getInt("pt.cancel.min-hours-before", 4);
         long gioConLai = Duration.between(OffsetDateTime.now(), s.getScheduledStart()).toHours();
-        boolean huyMuon = gioConLai < GIO_HUY_MUON;
+        boolean huyMuon = gioConLai < gioHuyMuon;
 
         s.setStatus(SessionStatus.CANCELLED);
         s.setCancelledBy(benHuy);
@@ -339,6 +359,53 @@ public class PtSessionService {
     }
 
     // ---------------------------------------------------------------- riêng tư
+
+    // ------------------------------------------------------------ trùng lịch
+
+    /** Hai khoảng thời gian [start1,end1) và [start2,end2) có giao nhau không. */
+    private boolean giaoNhau(OffsetDateTime start1, OffsetDateTime end1,
+                             OffsetDateTime start2, OffsetDateTime end2) {
+        return start1.isBefore(end2) && start2.isBefore(end1);
+    }
+
+    /**
+     * Huấn luyện viên đã có buổi SCHEDULED nào giao giờ với khoảng [batDau, ketThuc)
+     * chưa. {@code boQuaSessionId} dùng khi kiểm tra lại chính buổi đang xét (loại
+     * bản thân nó ra khỏi danh sách so sánh) — truyền {@code null} khi đặt lịch mới,
+     * vì lúc đó buổi chưa tồn tại nên không cần loại trừ gì.
+     */
+    private boolean trungLichDaChot(Long trainerId, OffsetDateTime batDau, OffsetDateTime ketThuc,
+                                    Long boQuaSessionId) {
+        return sessionRepo.findByTrainerIdAndStatusAndDeletedAtIsNull(trainerId, SessionStatus.SCHEDULED)
+                .stream()
+                .filter(s -> boQuaSessionId == null || !s.getId().equals(boQuaSessionId))
+                .anyMatch(s -> giaoNhau(batDau, ketThuc, s.getScheduledStart(), s.getScheduledEnd()));
+    }
+
+    /**
+     * Buổi {@code vuaDuyet} vừa chuyển SCHEDULED — quét các yêu cầu KHÁC của cùng
+     * huấn luyện viên đang PENDING_TRAINER, trùng giờ với buổi vừa chốt, tự động
+     * chuyển sang REJECTED. Không đụng tới các yêu cầu không trùng giờ.
+     */
+    private void tuChoiCacBuoiTrungLich(PtSession vuaDuyet) {
+        List<PtSession> dangCho = sessionRepo.findByTrainerIdAndStatusAndDeletedAtIsNull(
+                vuaDuyet.getTrainer().getId(), SessionStatus.PENDING_TRAINER);
+
+        OffsetDateTime bayGio = OffsetDateTime.now();
+        for (PtSession khac : dangCho) {
+            if (khac.getId().equals(vuaDuyet.getId())) continue;
+            if (!giaoNhau(vuaDuyet.getScheduledStart(), vuaDuyet.getScheduledEnd(),
+                          khac.getScheduledStart(), khac.getScheduledEnd())) {
+                continue;
+            }
+            khac.setStatus(SessionStatus.REJECTED);
+            khac.setRejectReason("Hệ thống tự động từ chối: trùng giờ với buổi #"
+                    + vuaDuyet.getId() + " của huấn luyện viên vừa được duyệt");
+            khac.setRespondedAt(bayGio);
+            log.info("Tự động từ chối buổi #{} vì trùng giờ với buổi #{} vừa được duyệt",
+                    khac.getId(), vuaDuyet.getId());
+        }
+    }
 
     private PtSession require(Long id) {
         return sessionRepo.findById(id)

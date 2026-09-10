@@ -14,4 +14,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByEmployeeCodeAndDeletedAtIsNull(String employeeCode);
 
     List<Employee> findByDepartmentAndDeletedAtIsNull(Department department);
+
+    List<Employee> findByDeletedAtIsNull();
 }

@@ -14,6 +14,7 @@ import com.gym.identity.repository.UserRepository;
 import com.gym.membership.domain.Registration;
 import com.gym.membership.domain.RegistrationStatus;
 import com.gym.membership.repository.RegistrationRepository;
+import com.gym.settings.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,17 +43,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CheckInService {
 
-    /** Quét lại trong khoảng này bị coi là bất thường. Sẽ chuyển sang system_settings. */
-    private static final int PHUT_CHONG_QUET_LAI = 30;
-
-    /** Giờ đóng cửa, dùng cho job tự đóng lượt quên quét. */
-    private static final LocalTime GIO_DONG_CUA = LocalTime.of(22, 30);
-
     private final CheckInRepository checkInRepo;
     private final MemberRepository memberRepo;
     private final RegistrationRepository registrationRepo;
     private final InvoiceRepository invoiceRepo;
     private final UserRepository userRepo;
+    private final PendingSelfCheckInStore hangDoiTuCheckIn;
+    private final SystemSettingService settings;
 
     /**
      * Xử lý một lượt quét vào.
@@ -74,6 +71,10 @@ public class CheckInService {
             throw ApiException.notFound("Không tìm thấy hội viên");
         }
 
+        // Xử lý xong qua đường nào (tìm tay hay hàng đợi tự check-in) cũng coi như
+        // đã giải quyết yêu cầu — không để hội viên còn kẹt trong hàng đợi màn hình quầy.
+        hangDoiTuCheckIn.xoaYeuCau(memberId);
+
         CheckIn c = new CheckIn();
         c.setMember(m);
         c.setMethod(CheckInMethod.QR_DYNAMIC);
@@ -86,14 +87,63 @@ public class CheckInService {
             return ghiNhan(c);
         }
 
-        // ---- Phát hiện bất thường ----
+        // ---- Đang ở trong phòng tập (cùng ngày) mà lại quét vào lần nữa → CHẶN ----
+        // Trước đây chỉ đánh dấu "bất thường" để thống kê rồi vẫn cho vào — dẫn tới
+        // lễ tân bấm nhiều lần là ghi trùng nhiều lượt "đang trong phòng" cho cùng
+        // một người. Lượt của NGÀY HÔM TRƯỚC thì bỏ qua, vì gần như chắc chắn là
+        // quên quét lúc về chứ không phải đang thực sự ở trong phòng.
+        var luotDangMoCungNgay = timLuotDangMoCungNgay(m.getId());
+        if (luotDangMoCungNgay.isPresent()) {
+            c.setResult(CheckInResult.DENIED_ALREADY_INSIDE);
+            c.setIncidentType(IncidentType.SUSPECTED_SHARING);
+            c.setIncidentNote("Đã quét vào lúc " + luotDangMoCungNgay.get().getCheckedInAt()
+                    + ", chưa quét ra — nghi dùng chung tài khoản hoặc quét nhầm lần hai");
+            return ghiNhan(c);
+        }
+
+        // ---- Phát hiện bất thường khác (quét lại quá nhanh sau khi đã quét ra) ----
         phatHienBatThuong(c, m);
 
         // ---- Tìm hợp đồng dùng để vào ----
         List<Registration> hopDongs =
                 registrationRepo.findByMemberIdAndDeletedAtIsNullOrderByContractDateDesc(m.getId());
+        TrangThaiHopDong tt = xacDinhTrangThaiHopDong(hopDongs, LocalDate.now());
 
-        LocalDate homNay = LocalDate.now();
+        if (tt.dangChay() == null) {
+            if (tt.dangBaoLuu()) {
+                c.setResult(CheckInResult.DENIED_FROZEN);
+            } else if (tt.choThanhToan() != null) {
+                c.setResult(CheckInResult.DENIED_UNPAID);
+                c.setRegistration(tt.choThanhToan());
+                c.setIncidentNote("Hợp đồng chưa thanh toán: " + tt.choThanhToan().getRegistrationCode());
+            } else {
+                c.setResult(CheckInResult.DENIED_EXPIRED);
+                if (c.getIncidentType() == null) {
+                    c.setIncidentType(IncidentType.EXPIRED_ATTEMPT);
+                }
+            }
+            return ghiNhan(c);
+        }
+
+        c.setRegistration(tt.dangChay());
+
+        // ---- Còn nợ tiền: cảnh báo, nhưng lễ tân được phép cho vào ----
+        if (tt.conNo() && !boQuaCanhBao) {
+            c.setResult(CheckInResult.DENIED_UNPAID);
+            return ghiNhan(c);
+        }
+
+        // Lễ tân chủ động bỏ qua cảnh báo — ghi lại rõ để truy trách nhiệm
+        c.setResult(tt.conNo() ? CheckInResult.ALLOWED_OVERRIDE : CheckInResult.ALLOWED);
+        return ghiNhan(c);
+    }
+
+    /** Kết quả tra cứu hợp đồng dùng chung giữa {@link #quetVao} và {@link #xemTruoc}. */
+    private record TrangThaiHopDong(Registration dangChay, boolean dangBaoLuu,
+                                     Registration choThanhToan, boolean conNo) {}
+
+    /** Xác định hợp đồng đang chạy (và tình trạng nợ tiền) hoặc lý do không có hợp đồng nào dùng được. */
+    private TrangThaiHopDong xacDinhTrangThaiHopDong(List<Registration> hopDongs, LocalDate homNay) {
         Registration dangChay = hopDongs.stream()
                 .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE
                           && (r.getEndDate() == null || !r.getEndDate().isBefore(homNay)))
@@ -102,61 +152,38 @@ public class CheckInService {
         if (dangChay == null) {
             boolean dangBaoLuu = hopDongs.stream()
                     .anyMatch(r -> r.getStatus() == RegistrationStatus.FROZEN);
-
-            c.setResult(dangBaoLuu ? CheckInResult.DENIED_FROZEN : CheckInResult.DENIED_EXPIRED);
-            if (c.getIncidentType() == null && !dangBaoLuu) {
-                c.setIncidentType(IncidentType.EXPIRED_ATTEMPT);
-            }
-            return ghiNhan(c);
+            Registration choThanhToan = hopDongs.stream()
+                    .filter(r -> r.getStatus() == RegistrationStatus.PENDING_PAYMENT)
+                    .findFirst().orElse(null);
+            return new TrangThaiHopDong(null, dangBaoLuu, choThanhToan, false);
         }
 
-        c.setRegistration(dangChay);
-
-        // ---- Còn nợ tiền: cảnh báo, nhưng lễ tân được phép cho vào ----
         boolean conNo = invoiceRepo.findByRegistrationIdAndDeletedAtIsNull(dangChay.getId())
                 .map(inv -> inv.getStatus() == InvoiceStatus.UNPAID
                          || inv.getStatus() == InvoiceStatus.PARTIALLY_PAID
                          || inv.getStatus() == InvoiceStatus.OVERDUE)
                 .orElse(false);
+        return new TrangThaiHopDong(dangChay, false, null, conNo);
+    }
 
-        if (conNo && !boQuaCanhBao) {
-            c.setResult(CheckInResult.DENIED_UNPAID);
-            return ghiNhan(c);
-        }
-
-        // Lễ tân chủ động bỏ qua cảnh báo — ghi lại rõ để truy trách nhiệm
-        c.setResult(conNo ? CheckInResult.ALLOWED_OVERRIDE : CheckInResult.ALLOWED);
-        return ghiNhan(c);
+    /** Lượt vào chưa quét ra, TÍNH TỪ ĐÚNG NGÀY HÔM NAY — dùng chung giữa {@link #quetVao} và {@link #xemTruoc}. */
+    private java.util.Optional<CheckIn> timLuotDangMoCungNgay(Long memberId) {
+        return checkInRepo.findFirstByMemberIdAndCheckedOutAtIsNullOrderByCheckedInAtDesc(memberId)
+                .filter(luotCu -> luotCu.getCheckedInAt().toLocalDate().equals(LocalDate.now()));
     }
 
     /**
-     * Ghi nhận các dấu hiệu bất thường.
-     *
-     * <p>Không chặn lượt vào — chỉ đánh dấu để lễ tân chú ý và để hệ thống thống
-     * kê. Quyết định cuối vẫn thuộc về người đứng quầy.
+     * Ghi nhận dấu hiệu bất thường CÒN LẠI sau khi đã loại trường hợp "đang ở
+     * trong phòng" (trường hợp đó giờ bị chặn hẳn ở {@link #quetVao}, không tới
+     * đây nữa). Không chặn lượt vào — chỉ đánh dấu để lễ tân chú ý và để hệ
+     * thống thống kê. Quyết định cuối vẫn thuộc về người đứng quầy.
      */
     private void phatHienBatThuong(CheckIn c, Member m) {
-        // Đang ở TRONG phòng tập mà lại có lượt vào mới → nghi dùng chung tài khoản
-        var dangTrongPhong = checkInRepo
-                .findFirstByMemberIdAndCheckedOutAtIsNullOrderByCheckedInAtDesc(m.getId());
-
-        if (dangTrongPhong.isPresent()) {
-            var luotCu = dangTrongPhong.get();
-            // Chỉ đáng nghi nếu là TRONG CÙNG NGÀY. Lượt của hôm trước gần như
-            // chắc chắn là do quên quét lúc về, không phải gian lận.
-            boolean cungNgay = luotCu.getCheckedInAt().toLocalDate().equals(LocalDate.now());
-            if (cungNgay) {
-                c.setIncidentType(IncidentType.SUSPECTED_SHARING);
-                c.setIncidentNote("Lượt vào lúc " + luotCu.getCheckedInAt()
-                        + " chưa quét ra, nghi dùng chung tài khoản");
-                return;
-            }
-        }
-
         // Quét lại quá nhanh sau lượt trước
+        int phutChongQuetLai = settings.getInt("checkin.duplicate-scan-window-minutes", 30);
         checkInRepo.findFirstByMemberIdOrderByCheckedInAtDesc(m.getId()).ifPresent(luotCu -> {
             long phut = Duration.between(luotCu.getCheckedInAt(), OffsetDateTime.now()).toMinutes();
-            if (phut < PHUT_CHONG_QUET_LAI && luotCu.getCheckedOutAt() != null) {
+            if (phut < phutChongQuetLai && luotCu.getCheckedOutAt() != null) {
                 c.setIncidentType(IncidentType.ANTI_PASSBACK);
                 c.setIncidentNote("Quét lại sau " + phut + " phút");
             }
@@ -166,10 +193,10 @@ public class CheckInService {
     /**
      * Xem trước tình trạng hội viên — KHÔNG ghi lượt check-in nào.
      *
-     * <p>Cố tình KHÔNG dùng chung code với {@link #quetVao}: hàm đó phải ghi lại
-     * cả lượt bị từ chối (để thống kê) và xử lý cờ vượt cảnh báo, còn hàm này chỉ
-     * đọc và trả lời "có vào được không" cho lễ tân xem trước khi bấm xác nhận.
-     * Tách riêng để không phải sửa logic đã có 19 test bao phủ trong quetVao.
+     * <p>Dùng chung {@link #xacDinhTrangThaiHopDong} với {@link #quetVao} để tra hợp đồng,
+     * nhưng KHÔNG dùng chung phần quyết định kết quả cuối: {@link #quetVao} còn phải ghi
+     * lại lượt bị từ chối (để thống kê) và xử lý cờ vượt cảnh báo, còn hàm này chỉ đọc và
+     * trả lời "có vào được không" cho lễ tân xem trước khi bấm xác nhận.
      */
     @Transactional(readOnly = true)
     public CheckInPreviewResponse xemTruoc(Long memberId) {
@@ -181,29 +208,57 @@ public class CheckInService {
             return CheckInPreviewResponse.of(m, CheckInResult.DENIED_SUSPECT, null);
         }
 
-        List<Registration> hopDongs =
-                registrationRepo.findByMemberIdAndDeletedAtIsNullOrderByContractDateDesc(m.getId());
-        LocalDate homNay = LocalDate.now();
-        Registration dangChay = hopDongs.stream()
-                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE
-                          && (r.getEndDate() == null || !r.getEndDate().isBefore(homNay)))
-                .findFirst().orElse(null);
-
-        if (dangChay == null) {
-            boolean dangBaoLuu = hopDongs.stream()
-                    .anyMatch(r -> r.getStatus() == RegistrationStatus.FROZEN);
-            return CheckInPreviewResponse.of(m,
-                    dangBaoLuu ? CheckInResult.DENIED_FROZEN : CheckInResult.DENIED_EXPIRED, null);
+        if (timLuotDangMoCungNgay(m.getId()).isPresent()) {
+            return CheckInPreviewResponse.of(m, CheckInResult.DENIED_ALREADY_INSIDE, null);
         }
 
-        boolean conNo = invoiceRepo.findByRegistrationIdAndDeletedAtIsNull(dangChay.getId())
-                .map(inv -> inv.getStatus() == InvoiceStatus.UNPAID
-                         || inv.getStatus() == InvoiceStatus.PARTIALLY_PAID
-                         || inv.getStatus() == InvoiceStatus.OVERDUE)
-                .orElse(false);
+        List<Registration> hopDongs =
+                registrationRepo.findByMemberIdAndDeletedAtIsNullOrderByContractDateDesc(m.getId());
+        TrangThaiHopDong tt = xacDinhTrangThaiHopDong(hopDongs, LocalDate.now());
+
+        if (tt.dangChay() == null) {
+            if (tt.dangBaoLuu()) {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_FROZEN, null);
+            } else if (tt.choThanhToan() != null) {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_UNPAID, tt.choThanhToan());
+            } else {
+                return CheckInPreviewResponse.of(m, CheckInResult.DENIED_EXPIRED, null);
+            }
+        }
 
         return CheckInPreviewResponse.of(m,
-                conNo ? CheckInResult.DENIED_UNPAID : CheckInResult.ALLOWED, dangChay);
+                tt.conNo() ? CheckInResult.DENIED_UNPAID : CheckInResult.ALLOWED, tt.dangChay());
+    }
+
+    /**
+     * Hội viên tự bấm "Tôi đã đến phòng tập" trên app — CHƯA ghi lượt check-in nào,
+     * chỉ đưa vào hàng đợi để màn hình quầy hiện tên + ảnh cho lễ tân đối chiếu.
+     */
+    @Transactional(readOnly = true)
+    public CheckInPreviewResponse guiYeuCauTuCheckIn(Long actorUserId) {
+        Member m = memberCuaUser(actorUserId);
+        hangDoiTuCheckIn.themYeuCau(m.getId());
+        return xemTruoc(m.getId());
+    }
+
+    /** Lễ tân bỏ qua một yêu cầu tự check-in (hội viên bỏ đi, hoặc bấm nhầm) mà không cho vào. */
+    public void boQuaYeuCauTuCheckIn(Long memberId) {
+        hangDoiTuCheckIn.xoaYeuCau(memberId);
+    }
+
+    /** Hàng đợi cho màn hình quầy — tính lại tình trạng mới nhất cho từng người, không dùng dữ liệu cũ lúc gửi yêu cầu. */
+    @Transactional(readOnly = true)
+    public List<CheckInPreviewResponse> hangDoiChoXacNhan() {
+        return hangDoiTuCheckIn.danhSachDangCho().stream()
+                .map(this::xemTruoc)
+                .toList();
+    }
+
+    private Member memberCuaUser(Long userId) {
+        var u = userRepo.findById(userId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản"));
+        return memberRepo.findByPersonIdAndDeletedAtIsNull(u.getPerson().getId())
+                .orElseThrow(() -> ApiException.badRequest("NOT_A_MEMBER", "Tài khoản chưa có hồ sơ hội viên"));
     }
 
     /** Hội viên quét ra khi về. */
@@ -231,9 +286,10 @@ public class CheckInService {
         var dauNgayHomNay = OffsetDateTime.now().with(LocalTime.MIN);
         List<CheckIn> quenQuet = checkInRepo.timLuotQuenCheckOut(dauNgayHomNay);
 
+        LocalTime gioDongCua = settings.getLocalTime("gym.closing-time", LocalTime.of(22, 30));
         for (CheckIn c : quenQuet) {
             // Lấy giờ đóng cửa của ĐÚNG NGÀY hội viên vào, không phải hôm nay
-            c.setCheckedOutAt(c.getCheckedInAt().with(GIO_DONG_CUA));
+            c.setCheckedOutAt(c.getCheckedInAt().with(gioDongCua));
             c.setAutoClosed(true);
         }
 

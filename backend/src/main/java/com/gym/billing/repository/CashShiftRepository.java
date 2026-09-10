@@ -15,4 +15,7 @@ public interface CashShiftRepository extends JpaRepository<CashShift, Long> {
     List<CashShift> findByEmployeeIdOrderByOpenedAtDesc(Long employeeId);
 
     List<CashShift> findByStatusOrderByOpenedAtDesc(CashShiftStatus status);
+
+    /** Dùng cho dashboard Admin: ca đang mở, ca lệch quỹ. */
+    long countByStatus(CashShiftStatus status);
 }

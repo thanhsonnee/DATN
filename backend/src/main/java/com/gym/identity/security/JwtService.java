@@ -51,6 +51,10 @@ public class JwtService {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
+                // Mang theo phiên bản token lúc cấp — AuthService.refresh so với
+                // users.token_version hiện tại để biết token này còn hiệu lực hay
+                // đã bị thu hồi (đăng xuất thật / đổi mật khẩu tăng version lên).
+                .claim("tokenVersion", user.getTokenVersion())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(props.jwt().refreshTokenTtl())))
                 .signWith(key)

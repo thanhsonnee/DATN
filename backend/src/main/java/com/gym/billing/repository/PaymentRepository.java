@@ -22,12 +22,29 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      * <p>Cộng cả khoản hoàn tiền (số âm) nên ra đúng số tiền thực còn trong két.
      */
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
-         + "WHERE p.cashShift.id = :shiftId "
-         + "  AND p.status = com.gym.billing.domain.PaymentStatus.SUCCEEDED")
-    BigDecimal tongTienMatTrongCa(@Param("shiftId") Long shiftId);
+         + "WHERE p.cashShift.id = :shiftId AND p.status = :status")
+    BigDecimal tongTienMatTrongCa(@Param("shiftId") Long shiftId, @Param("status") PaymentStatus status);
 
     /** Tổng đã thu của một hóa đơn, dùng để cập nhật lại số đã trả. */
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
          + "WHERE p.invoice.id = :invoiceId AND p.status = :status")
     BigDecimal tongDaThu(@Param("invoiceId") Long invoiceId, @Param("status") PaymentStatus status);
+
+    /** Tổng tiền thực thu giữa 2 mốc thời gian. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
+         + "WHERE p.status = :status "
+         + "  AND p.paidAt >= :from AND p.paidAt <= :to")
+    BigDecimal sumCollectedBetween(@Param("status") PaymentStatus status,
+                                    @Param("from") java.time.OffsetDateTime from,
+                                    @Param("to") java.time.OffsetDateTime to);
+
+    /** Tổng doanh số do nhân viên thu/chốt trong khoảng thời gian. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p "
+         + "WHERE p.status = :status "
+         + "  AND p.receivedBy.id = :userId "
+         + "  AND p.paidAt >= :from AND p.paidAt <= :to")
+    BigDecimal sumCollectedByUserBetween(@Param("userId") Long userId,
+                                         @Param("status") PaymentStatus status,
+                                         @Param("from") java.time.OffsetDateTime from,
+                                         @Param("to") java.time.OffsetDateTime to);
 }

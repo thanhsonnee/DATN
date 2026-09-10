@@ -41,11 +41,37 @@ export function useXemTruocCheckIn(memberId: number | null) {
   })
 }
 
+/** Hội viên bấm "Tôi đã đến phòng tập" trên app — chưa ghi lượt vào, chỉ vào hàng đợi chờ lễ tân. */
+export function useGuiYeuCauTuCheckIn() {
+  return useMutation({
+    mutationFn: () => api.post<CheckInPreview>('/check-ins/self-request'),
+  })
+}
+
+/** Hàng đợi cho màn hình quầy — cập nhật liên tục vì mang tính thời điểm, hội viên đang đứng chờ. */
+export function useHangDoiChoXacNhan() {
+  return useQuery({
+    queryKey: ['check-ins', 'pending-requests'],
+    queryFn: () => api.get<CheckInPreview[]>('/check-ins/pending-requests'),
+    refetchInterval: 4_000,
+  })
+}
+
+export function useBoQuaYeuCau() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (memberId: number) => api.delete<void>(`/check-ins/pending-requests/${memberId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['check-ins', 'pending-requests'] }),
+  })
+}
+
 export function useQuetVao() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ memberId, override }: { memberId: number; override?: boolean }) =>
       api.post<CheckInResult>('/check-ins', { memberId, override }),
+    // Prefix 'check-ins' khớp cả 'inside' lẫn 'pending-requests' — quét vào qua
+    // đường tìm kiếm cũng tự dọn hàng đợi tự check-in của đúng người đó (xử lý ở backend).
     onSuccess: () => qc.invalidateQueries({ queryKey: ['check-ins'] }),
   })
 }

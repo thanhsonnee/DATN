@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,9 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByPersonIdAndDeletedAtIsNull(Long personId);
 
     Optional<Member> findByMemberCodeAndDeletedAtIsNull(String memberCode);
+
+    /** Hội viên mới trong khoảng — dùng cho dashboard Admin (join_date, không phải created_at). */
+    long countByJoinDateBetweenAndDeletedAtIsNull(LocalDate from, LocalDate to);
 
     /**
      * Tìm hội viên theo tên, số điện thoại hoặc mã hội viên.

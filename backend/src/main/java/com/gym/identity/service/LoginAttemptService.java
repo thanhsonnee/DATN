@@ -2,6 +2,7 @@ package com.gym.identity.service;
 
 import com.gym.identity.domain.User;
 import com.gym.identity.repository.UserRepository;
+import com.gym.settings.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,11 +28,8 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class LoginAttemptService {
 
-    /** Sai quá số lần này thì khóa tạm. Sẽ chuyển sang system_settings khi có bảng cấu hình. */
-    private static final int MAX_FAILED_ATTEMPTS = 5;
-    private static final int LOCKOUT_MINUTES = 15;
-
     private final UserRepository userRepo;
+    private final SystemSettingService settings;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(Long userId) {
@@ -41,10 +39,12 @@ public class LoginAttemptService {
         short attempts = (short) (user.getFailedAttempts() + 1);
         user.setFailedAttempts(attempts);
 
-        if (attempts >= MAX_FAILED_ATTEMPTS) {
+        int maxFailedAttempts = settings.getInt("security.login.max-failed-attempts", 5);
+        if (attempts >= maxFailedAttempts) {
+            int lockoutMinutes = settings.getInt("security.login.lockout-minutes", 15);
             // Đặt auto_locked_until — KHÔNG đụng tới locked_until của Admin,
             // để job mở khóa tự động không phá lệnh khóa thủ công.
-            user.setAutoLockedUntil(OffsetDateTime.now().plusMinutes(LOCKOUT_MINUTES));
+            user.setAutoLockedUntil(OffsetDateTime.now().plusMinutes(lockoutMinutes));
             log.warn("Khóa tạm tài khoản do sai mật khẩu {} lần: userId={}", attempts, userId);
         }
         userRepo.save(user);

@@ -158,6 +158,15 @@ export interface MemberSearchResult {
   fullName: string
   phone: string
   status: string
+  photoKey: string | null
+}
+
+export interface MemberPhotoResponse {
+  memberId: number
+  memberCode: string
+  fullName: string
+  photoKey: string
+  photoUrl: string
 }
 
 export interface Trainer {
@@ -170,3 +179,260 @@ export interface Trainer {
   ratingAvg: number | null
   ratingCount: number | null
 }
+
+// ------------------------------------------------------------ Tài chính nâng cao (E3, E4, E5)
+
+// E3: Doanh thu dồn tích
+export interface RevenueSchedule {
+  id: number
+  registrationId: number
+  registrationCode: string
+  memberName: string
+  scheduleDate: string
+  amount: number
+  status: 'PENDING' | 'RECOGNIZED' | 'REVERSED'
+  recognitionMethod: string
+  recognizedAt: string | null
+  note: string | null
+}
+
+export interface RevenueReport {
+  month: number
+  year: number
+  totalCashCollected: number
+  totalAccrualRecognized: number
+  totalDeferredRevenue: number
+  schedules: RevenueSchedule[]
+}
+
+// E4: Bảng lương
+export type PayrollStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED'
+
+export interface PayrollItem {
+  id: number
+  employeeId: number
+  employeeCode: string
+  employeeName: string
+  department: string
+  position: string | null
+  baseSalary: number
+  ptSessionsCount: number
+  ptCommission: number
+  salesContractsCount: number
+  salesCommission: number
+  bonusAmount: number
+  deductionAmount: number
+  netSalary: number
+  note: string | null
+}
+
+export interface PayrollRun {
+  id: number
+  payrollCode: string
+  periodMonth: number
+  periodYear: number
+  totalBaseSalary: number
+  totalCommission: number
+  totalBonus: number
+  totalDeduction: number
+  totalNetSalary: number
+  status: PayrollStatus
+  createdByName: string | null
+  approvedByName: string | null
+  approvedAt: string | null
+  paidByName: string | null
+  paidAt: string | null
+  note: string | null
+  hasManualEdits: boolean
+  items: PayrollItem[]
+}
+
+// E5: Chi phí & Lợi nhuận
+export type ExpenseCategory =
+  | 'RENT'
+  | 'UTILITIES'
+  | 'EQUIPMENT_MAINTENANCE'
+  | 'SALARY'
+  | 'SUPPLIES'
+  | 'MARKETING'
+  | 'OTHER'
+
+export interface Expense {
+  id: number
+  expenseNo: string
+  category: ExpenseCategory
+  title: string
+  amount: number
+  spentAt: string
+  spentByName: string | null
+  approvedByName: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  paymentMethod: PaymentMethod
+  receiptUrl: string | null
+  note: string | null
+  createdAt: string
+}
+
+export interface ProfitLossReport {
+  month: number
+  year: number
+  cashRevenue: number
+  accrualRevenue: number
+  operatingExpenses: number
+  salaryExpenses: number
+  totalExpenses: number
+  netProfitCashBasis: number
+  netProfitAccrualBasis: number
+  expensesByCategory: Record<string, number>
+}
+
+// ------------------------------------------------------------ Bán hàng & CRM (Phân đoạn F)
+
+export type LeadSource = 'WALK_IN' | 'HOTLINE' | 'WEB_FORM' | 'REFERRAL' | 'APP_SELF'
+
+export type LeadStage = 'NEW' | 'CONTACTED' | 'TRIAL_BOOKED' | 'TRIAL_DONE' | 'WON' | 'LOST'
+
+export type LostReason = 'PRICE' | 'LOCATION' | 'COMPETITOR' | 'NOT_READY' | 'NO_RESPONSE'
+
+export interface Lead {
+  id: number
+  personId: number
+  fullName: string
+  phone: string
+  email: string | null
+  source: LeadSource
+  interestedMembershipId: number | null
+  interestedMembershipName: string | null
+  interestedMembershipCode: string | null
+  interestedMembershipPrice: number | null
+  assignedToId: number | null
+  assignedToName: string | null
+  assignedToCode: string | null
+  stage: LeadStage
+  lostReason: LostReason | null
+  lastContactAt: string | null
+  lastContactNote: string | null
+  nextFollowUp: string | null
+  createdAt: string
+}
+
+export interface AppUserLead {
+  personId: number
+  fullName: string
+  phone: string
+  email: string | null
+  registeredAt: string
+  daysSinceRegistration: number
+}
+
+export interface FunnelStats {
+  totalLeads: number
+  stageCounts: Record<string, number>
+  lostReasonCounts: Record<string, number>
+  conversionRate: number
+}
+
+// ------------------------------------------------------------ phản hồi & thiết bị (H)
+
+export type EquipmentStatus = 'ACTIVE' | 'NEEDS_REPAIR' | 'UNDER_REPAIR' | 'RETIRED'
+
+export interface Equipment {
+  id: number
+  name: string
+  roomName: string | null
+  status: EquipmentStatus
+  note: string | null
+}
+
+export type FeedbackType = 'TRAINER' | 'FACILITY' | 'HYGIENE' | 'SERVICE' | 'GENERAL'
+
+export type FeedbackStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'RESOLVED' | 'CLOSED'
+
+export interface Feedback {
+  id: number
+  memberId: number
+  memberName: string
+  feedbackType: FeedbackType
+  trainerId: number | null
+  trainerName: string | null
+  equipmentId: number | null
+  equipmentName: string | null
+  rating: number | null
+  description: string
+  status: FeedbackStatus
+  urgent: boolean
+  repairCost: number | null
+  resolutionNote: string | null
+  resolvedByName: string | null
+  resolvedAt: string | null
+  createdAt: string
+}
+
+// ------------------------------------------------------------ Quản trị (Admin)
+
+/** 4 vai trò Admin tạo được tài khoản thay — KHÔNG bao gồm ADMIN/MEMBER. */
+export type EmployeeRole = 'TRAINER' | 'SALE' | 'RECEPTIONIST' | 'ACCOUNTANT'
+
+export type Department = 'TRAINING' | 'SALES' | 'FRONT_DESK' | 'ACCOUNTING'
+
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'FREELANCE'
+
+export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'RESIGNED'
+
+export interface EmployeeAccount {
+  employeeId: number
+  userId: number
+  employeeCode: string
+  username: string
+  fullName: string
+  role: EmployeeRole
+  department: Department
+  /** Chỉ có trong response TẠO tài khoản — không xem lại được sau khi rời trang. */
+  tempPassword: string
+}
+
+export interface EmployeeSummary {
+  id: number
+  employeeCode: string
+  fullName: string
+  phone: string
+  email: string | null
+  department: Department
+  position: string | null
+  status: EmployeeStatus
+  startDate: string
+}
+
+export interface AdminMembersOverview {
+  activeCount: number
+  newThisMonthCount: number
+  expiringSoonCount: number
+  frozenCount: number
+}
+
+export interface AdminRevenueOverview {
+  cashCollectedThisMonth: number
+  accrualRecognizedThisMonth: number
+  deferredRevenueThisMonth: number
+  unpaidOverdueAmount: number
+  unpaidOverdueCount: number
+}
+
+export interface AdminOperationsToday {
+  checkInsToday: number
+  deniedToday: number
+  openCashShifts: number
+  cashShiftDiscrepancies: number
+  openFeedbacksCount: number
+  urgentFeedbacksCount: number
+  equipmentNeedsRepairCount: number
+  draftPayrollRunsCount: number
+}
+
+export interface AdminDashboard {
+  membersOverview: AdminMembersOverview
+  revenueOverview: AdminRevenueOverview
+  operationsToday: AdminOperationsToday
+}
+
+

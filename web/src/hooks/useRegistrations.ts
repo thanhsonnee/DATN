@@ -41,6 +41,34 @@ export interface MuaGoiInput {
   membershipId: number
   discountAmount?: number
   discountReason?: string
+  /** Hợp đồng đang gia hạn tiếp nối — gói mới sẽ bắt đầu ngay sau khi hợp đồng này hết hạn. */
+  renewFromRegistrationId?: number
+}
+
+export interface DeskRegisterInput {
+  fullName: string
+  phone: string
+  email?: string
+  membershipId: number
+  discountAmount?: number
+  discountReason?: string
+  assignedTrainerId?: number
+  note?: string
+  payNow: boolean
+  paymentMethod?: string
+}
+
+export function useDeskRegister() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: DeskRegisterInput) => api.post<Registration>('/registrations/desk', input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['registrations'] })
+      qc.invalidateQueries({ queryKey: ['cash-shift'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
+    },
+  })
 }
 
 export function useMuaGoi() {

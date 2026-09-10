@@ -64,6 +64,14 @@ public class User extends BaseEntity {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    /**
+     * Tăng lên mỗi lần đăng xuất thật (server-side) hoặc đổi mật khẩu — refresh
+     * token cũ mang version thấp hơn bị {@code AuthService.refresh} từ chối
+     * ngay, không cần bảng riêng lưu/thu hồi từng token.
+     */
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     /** Đăng nhập được không — xét cả khóa thủ công lẫn khóa tự động. */
     public boolean canLogin() {
         if (status == UserStatus.LOCKED) return false;

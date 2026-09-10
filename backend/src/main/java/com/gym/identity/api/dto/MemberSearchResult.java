@@ -8,11 +8,13 @@ public record MemberSearchResult(
         String memberCode,
         String fullName,
         String phone,
-        String status
+        String status,
+        String photoKey
 ) {
     public static MemberSearchResult from(Member m) {
         return new MemberSearchResult(
                 m.getId(), m.getMemberCode(), m.getPerson().getFullName(),
-                m.getPerson().getPhone(), m.getStatus().name());
+                m.getPerson().getPhone(), m.getStatus().name(),
+                m.getPerson().getPhotoKey());
     }
 }

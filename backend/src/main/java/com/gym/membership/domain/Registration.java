@@ -45,6 +45,11 @@ public class Registration extends BaseEntity {
     @JoinColumn(name = "assigned_trainer_id")
     private Employee assignedTrainer;
 
+    /** Hợp đồng được gia hạn tiếp nối — quyết định ngày bắt đầu lúc kích hoạt, xem {@code activate()}. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "renew_from_id")
+    private Registration renewFrom;
+
     // ---- Snapshot điều khoản: sao chép lúc ký, KHÔNG đọc ngược từ memberships ----
 
     @Enumerated(EnumType.STRING)

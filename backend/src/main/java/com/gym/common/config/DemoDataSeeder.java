@@ -35,8 +35,8 @@ public class DemoDataSeeder {
                     pkg("FIT-03M", "Gói Fitness 3 tháng", PackageType.TIME_BASED, 90, null, 1_800_000, 14, 3),
                     pkg("FIT-06M", "Gói Fitness 6 tháng", PackageType.TIME_BASED, 180, null, 3_000_000, 30, 4),
                     pkg("FIT-12M", "Gói Fitness 12 tháng", PackageType.TIME_BASED, 365, null, 4_800_000, 30, 5),
-                    ptPkg("PT-12", "Gói PT 12 buổi", 180, 12, 4_200_000, 6),
-                    ptPkg("PT-24", "Gói PT 24 buổi", 270, 24, 7_680_000, 7),
+                    ptPkg("PT-12", "Gói PT 12 buổi", 90, 12, 4_200_000, 14, 6),
+                    ptPkg("PT-24", "Gói PT 24 buổi", 180, 24, 7_680_000, 30, 7),
                     combo()));
 
             log.info("Đã nạp {} gói tập mẫu", membershipRepo.count());
@@ -58,8 +58,9 @@ public class DemoDataSeeder {
         return m;
     }
 
-    private Membership ptPkg(String code, String name, int days, int sessions, long price, int order) {
-        Membership m = pkg(code, name, PackageType.SESSION_BASED, days, sessions, price, 0, order);
+    private Membership ptPkg(String code, String name, int days, int sessions, long price,
+                             int freezeDays, int order) {
+        Membership m = pkg(code, name, PackageType.SESSION_BASED, days, sessions, price, freezeDays, order);
         m.setIncludesTrainer(true);
         return m;
     }
