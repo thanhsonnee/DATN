@@ -20,11 +20,18 @@ public record PayrollRunResponse(
         String createdByName,
         String approvedByName,
         OffsetDateTime approvedAt,
+        String paidByName,
         OffsetDateTime paidAt,
         String note,
+        boolean hasManualEdits,
         List<PayrollItemResponse> items
 ) {
     public static PayrollRunResponse from(PayrollRun pr) {
+        List<PayrollItemResponse> items = pr.getItems() != null
+                ? pr.getItems().stream().map(PayrollItemResponse::from).toList() : List.of();
+        boolean hasManualEdits = pr.getItems() != null
+                && pr.getItems().stream().anyMatch(i -> Boolean.TRUE.equals(i.getManuallyEdited()));
+
         return new PayrollRunResponse(
                 pr.getId(),
                 pr.getPayrollCode(),
@@ -39,9 +46,11 @@ public record PayrollRunResponse(
                 pr.getCreatedBy() != null ? pr.getCreatedBy().getPerson().getFullName() : null,
                 pr.getApprovedBy() != null ? pr.getApprovedBy().getPerson().getFullName() : null,
                 pr.getApprovedAt(),
+                pr.getPaidBy() != null ? pr.getPaidBy().getPerson().getFullName() : null,
                 pr.getPaidAt(),
                 pr.getNote(),
-                pr.getItems() != null ? pr.getItems().stream().map(PayrollItemResponse::from).toList() : List.of()
+                hasManualEdits,
+                items
         );
     }
 }

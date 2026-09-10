@@ -56,6 +56,10 @@ public class PayrollItem {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    /** Đã từng bị chỉnh thưởng/phạt thủ công — cảnh báo trước khi tính lại đè mất. */
+    @Column(name = "manually_edited", nullable = false)
+    private Boolean manuallyEdited = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 

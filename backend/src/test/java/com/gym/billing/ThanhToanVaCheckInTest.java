@@ -147,6 +147,15 @@ class ThanhToanVaCheckInTest {
     }
 
     @Test
+    @DisplayName("Hợp đồng vừa chốt mua hiện NGAY trong Công nợ, không cần chờ lễ tân xác nhận")
+    void hopDongMoiHienNgayTrongCongNo() {
+        given().header(auth(tokenLeTan)).when().get("/billing/invoices/unpaid")
+                .then().statusCode(200)
+                .body("registrationId", hasItem(registrationId))
+                .body("find { it.registrationId == " + registrationId + " }.status", equalTo("UNPAID"));
+    }
+
+    @Test
     @DisplayName("Mỗi hợp đồng chỉ xuất được một hóa đơn")
     void moiHopDongMotHoaDon() {
         xuatHoaDon();
@@ -446,11 +455,13 @@ class ThanhToanVaCheckInTest {
                 .when().post("/billing/cash-shifts/open").then().statusCode(201);
     }
 
+    /**
+     * Hóa đơn giờ được xuất NGAY lúc lập hợp đồng (xem RegistrationService),
+     * không còn chờ tới lúc gọi endpoint này — nên chỉ cần lấy lại id đã có sẵn.
+     */
     private int xuatHoaDon() {
-        return given().contentType(ContentType.JSON).header(auth(tokenLeTan))
-                .body(Map.of("registrationId", registrationId))
-                .when().post("/billing/invoices").then().statusCode(201)
-                .extract().path("id");
+        return jdbc.queryForObject(
+                "SELECT id FROM invoices WHERE registration_id = ?", Integer.class, registrationId);
     }
 
     private int thuTien(int invoiceId, int soTien, String hinhThuc) {

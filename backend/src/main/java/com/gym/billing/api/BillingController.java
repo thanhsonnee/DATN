@@ -68,15 +68,16 @@ public class BillingController {
     // -------------------------------------------------------- xác nhận gói tập
 
     @Operation(summary = "Xác nhận gói tập",
-            description = "Một lần bấm cho lễ tân: gộp xuất hóa đơn và thu đủ tiền, hợp đồng "
-                        + "TỰ kích hoạt ngay sau đó. Dùng sau khi đã cầm tiền mặt hoặc thấy "
-                        + "tiền chuyển khoản về.")
+            description = "Một lần bấm cho lễ tân: gộp xuất hóa đơn và thu tiền, dùng sau khi "
+                        + "đã cầm tiền mặt hoặc thấy tiền chuyển khoản về. Bỏ trống `amount` thì "
+                        + "mặc định thu ĐỦ và hợp đồng TỰ kích hoạt ngay. Nhập số tiền ít hơn để "
+                        + "thu cọc trước — hợp đồng chưa kích hoạt, hiện trong Công nợ chờ thu tiếp.")
     @PreAuthorize("hasAnyRole('RECEPTIONIST','ACCOUNTANT','ADMIN')")
     @PostMapping("/registrations/{registrationId}/confirm")
     public RegistrationResponse xacNhanGoiTap(@PathVariable Long registrationId,
                                               @AuthenticationPrincipal Long userId,
                                               @Valid @RequestBody XacNhanGoiTapRequest req) {
-        return billing.xacNhanGoiTap(registrationId, userId, PaymentMethod.valueOf(req.method()));
+        return billing.xacNhanGoiTap(registrationId, userId, PaymentMethod.valueOf(req.method()), req.amount());
     }
 
     // ---------------------------------------------------------------- thu tiền
@@ -142,7 +143,16 @@ public class BillingController {
 
     public record XacNhanGoiTapRequest(
             @Pattern(regexp = "CASH|BANK_TRANSFER|VIETQR|CARD_POS|E_WALLET|GATEWAY",
-                     message = "Hình thức thanh toán không hợp lệ") String method) {}
+                     message = "Hình thức thanh toán không hợp lệ") String method,
+
+            /**
+             * Số tiền thực nhận — bỏ trống thì mặc định thu ĐỦ (hành vi cũ, kích
+             * hoạt ngay). Nhập ít hơn giá trị hợp đồng để demo tình huống thu cọc
+             * trước: hóa đơn chuyển PARTIALLY_PAID, hợp đồng CHƯA kích hoạt, hiện
+             * lại trong "Công nợ" để thu tiếp phần còn lại bằng API Thu tiền.
+             */
+            @DecimalMin(value = "0.01", message = "Số tiền thu phải lớn hơn 0")
+            BigDecimal amount) {}
 
     public record XuatHoaDonRequest(
             @NotNull(message = "Vui lòng chọn hợp đồng") Long registrationId,

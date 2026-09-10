@@ -7,6 +7,7 @@ import com.gym.identity.repository.MemberRepository;
 import com.gym.identity.repository.PersonRepository;
 import com.gym.identity.repository.UserRepository;
 import com.gym.identity.security.JwtService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -112,7 +113,25 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // Đổi mật khẩu thì thu hồi luôn mọi refresh token cũ — nếu mật khẩu vừa
+        // đổi vì nghi lộ, kẻ nắm refresh token cũ (30 ngày) không refresh được nữa.
+        user.setTokenVersion(user.getTokenVersion() + 1);
         log.info("Đổi mật khẩu: userId={}", userId);
+    }
+
+    /**
+     * Đăng xuất THẬT SỰ ở server — khác với trước đây chỉ xóa token phía trình
+     * duyệt trong khi refresh token cũ (30 ngày) về mặt kỹ thuật vẫn còn dùng
+     * được nếu ai đó đã có nó. Tăng token_version khiến MỌI refresh token đã
+     * phát hành trước đó, ở mọi thiết bị/tab, bị từ chối ngay từ lần /refresh
+     * kế tiếp — không cần bảng riêng lưu và thu hồi từng token.
+     */
+    @Transactional
+    public void logout(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản"));
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        log.info("Đăng xuất (thu hồi refresh token): userId={}", userId);
     }
 
     @Transactional(readOnly = true)
@@ -131,7 +150,9 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public TokenResponse refresh(String refreshToken) {
-        Long userId = Long.valueOf(jwtService.parseRefreshToken(refreshToken).getSubject());
+        Claims claims = jwtService.parseRefreshToken(refreshToken);
+        Long userId = Long.valueOf(claims.getSubject());
+        Integer versionTrongToken = claims.get("tokenVersion", Integer.class);
 
         User user = userRepo.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> ApiException.unauthorized(
@@ -139,6 +160,12 @@ public class AuthService {
 
         if (!user.canLogin()) {
             throw ApiException.forbidden("ACCOUNT_LOCKED", "Tài khoản đang bị khóa");
+        }
+
+        // Token cấp từ trước lần đăng xuất thật/đổi mật khẩu gần nhất — đã bị thu hồi.
+        if (!user.getTokenVersion().equals(versionTrongToken)) {
+            throw ApiException.unauthorized("INVALID_REFRESH_TOKEN",
+                    "Refresh token đã bị thu hồi, vui lòng đăng nhập lại");
         }
 
         return buildToken(user);

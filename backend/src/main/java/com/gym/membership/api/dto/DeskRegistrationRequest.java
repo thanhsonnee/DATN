@@ -1,6 +1,7 @@
 package com.gym.membership.api.dto;
 
 import com.gym.billing.domain.PaymentMethod;
+import com.gym.common.util.ValidationPatterns;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
@@ -14,7 +15,7 @@ public record DeskRegistrationRequest(
         String fullName,
 
         @NotBlank(message = "Vui lòng nhập số điện thoại")
-        @Pattern(regexp = "^(0|\\+84)[35789][0-9]{8}$", message = "Số điện thoại phải gồm 10 chữ số hợp lệ (VD: 0912345678)")
+        @Pattern(regexp = ValidationPatterns.PHONE_VN, message = "Số điện thoại phải gồm 10 chữ số hợp lệ (VD: 0912345678)")
         String phone,
 
         @Email(message = "Email không đúng định dạng")

@@ -43,6 +43,8 @@ public class SecurityConfig {
                             "/api/v1/auth/forgot-password",
                             "/api/v1/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/memberships/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/files/photos/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/leads/public").permitAll()
                     // Tài liệu API
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .requestMatchers("/actuator/health").permitAll()

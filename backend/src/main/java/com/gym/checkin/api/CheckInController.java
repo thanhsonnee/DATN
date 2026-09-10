@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -52,6 +53,33 @@ public class CheckInController {
     @PostMapping("/{memberId}/check-out")
     public CheckInResponse quetRa(@PathVariable Long memberId) {
         return checkInService.quetRa(memberId);
+    }
+
+    @Operation(summary = "Hội viên tự check-in trên app",
+            description = "Bấm khi đã có mặt tại phòng tập. CHƯA ghi lượt vào — chỉ đưa vào "
+                        + "hàng đợi để màn hình quầy hiện tên + ảnh, lễ tân nhìn rồi mới xác nhận. "
+                        + "Tự biến mất sau 3 phút nếu không ai xử lý.")
+    @PostMapping("/self-request")
+    public CheckInPreviewResponse guiYeuCauTuCheckIn(@AuthenticationPrincipal Long userId) {
+        return checkInService.guiYeuCauTuCheckIn(userId);
+    }
+
+    @Operation(summary = "Hàng đợi hội viên đang chờ xác nhận",
+            description = "Danh sách hội viên đã tự bấm check-in trên app, cũ nhất trước. "
+                        + "Tách riêng khỏi luồng tìm kiếm thủ công — hai đường cùng tồn tại song song.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @GetMapping("/pending-requests")
+    public List<CheckInPreviewResponse> hangDoiChoXacNhan() {
+        return checkInService.hangDoiChoXacNhan();
+    }
+
+    @Operation(summary = "Bỏ qua một yêu cầu tự check-in",
+            description = "Không cho vào và không ghi lượt nào — dùng khi hội viên bỏ đi hoặc bấm nhầm.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @DeleteMapping("/pending-requests/{memberId}")
+    public ResponseEntity<Void> boQuaYeuCau(@PathVariable Long memberId) {
+        checkInService.boQuaYeuCauTuCheckIn(memberId);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Ai đang ở trong phòng tập")

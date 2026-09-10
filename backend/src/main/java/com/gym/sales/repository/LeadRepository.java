@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface LeadRepository extends JpaRepository<Lead, Long> {
 
@@ -19,8 +18,6 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     List<Lead> findByAssignedToIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long employeeId);
 
     List<Lead> findByAssignedToIdAndStageAndDeletedAtIsNullOrderByCreatedAtDesc(Long employeeId, LeadStage stage);
-
-    Optional<Lead> findByPersonIdAndDeletedAtIsNull(Long personId);
 
     List<Lead> findByPersonIdAndStageNotInAndDeletedAtIsNull(Long personId, List<LeadStage> closedStages);
 

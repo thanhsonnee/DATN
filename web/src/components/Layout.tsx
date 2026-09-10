@@ -13,12 +13,18 @@ interface MucMenu {
 const MENU: MucMenu[] = [
   { to: '/goi-cua-toi', nhan: 'Gói của tôi' },
   { to: '/buoi-tap', nhan: 'Buổi tập' },
+  { to: '/check-in', nhan: 'Check-in', vaiTro: ['MEMBER'] },
+  { to: '/phan-hoi', nhan: 'Phản hồi', vaiTro: ['MEMBER'] },
+  { to: '/quan-ly-phan-hoi', nhan: 'Xử lý phản hồi', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
   { to: '/ban-hang', nhan: 'Bán hàng (CRM)', vaiTro: ['SALE', 'RECEPTIONIST', 'ADMIN'] },
   { to: '/lich-day', nhan: 'Lịch dạy', vaiTro: ['TRAINER', 'ADMIN'] },
+  { to: '/danh-gia-cua-toi', nhan: 'Đánh giá về tôi', vaiTro: ['TRAINER', 'ADMIN'] },
   { to: '/quay', nhan: 'Màn hình quầy', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
   { to: '/thu-ngan', nhan: 'Thu ngân', vaiTro: ['RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'] },
   { to: '/quan-ly', nhan: 'Hợp đồng', vaiTro: ['SALE', 'RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'] },
   { to: '/thong-ke', nhan: 'Thống kê', vaiTro: ['ADMIN', 'ACCOUNTANT'] },
+  { to: '/quan-tri', nhan: 'Dashboard', vaiTro: ['ADMIN'] },
+  { to: '/quan-tri/nhan-vien', nhan: 'Nhân viên', vaiTro: ['ADMIN'] },
 ]
 
 export function Layout() {

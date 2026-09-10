@@ -12,8 +12,6 @@ import java.util.List;
 
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-    List<Expense> findByDeletedAtIsNullOrderBySpentAtDesc();
-
     List<Expense> findBySpentAtBetweenAndDeletedAtIsNullOrderBySpentAtDesc(LocalDate from, LocalDate to);
 
     List<Expense> findByCategoryAndSpentAtBetweenAndDeletedAtIsNullOrderBySpentAtDesc(
@@ -25,6 +23,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT e.category, COALESCE(SUM(e.amount), 0) FROM Expense e " +
            "WHERE e.status = 'APPROVED' AND e.deletedAt IS NULL AND e.spentAt BETWEEN :from AND :to " +
-           "GROUP BY e.category")
+           "GROUP BY e.category ORDER BY e.category")
     List<Object[]> sumByCategoryBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

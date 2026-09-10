@@ -9,10 +9,10 @@ import java.util.Optional;
 
 public interface PayrollRunRepository extends JpaRepository<PayrollRun, Long> {
 
-    Optional<PayrollRun> findByPeriodMonthAndPeriodYearAndStatusNot(
-            Integer periodMonth, Integer periodYear, PayrollStatus status);
-
     Optional<PayrollRun> findByPeriodMonthAndPeriodYear(Integer periodMonth, Integer periodYear);
 
     List<PayrollRun> findAllByOrderByPeriodYearDescPeriodMonthDesc();
+
+    /** Đợt lương chưa duyệt — dùng cho dashboard Admin ("việc cần xử lý"). */
+    long countByStatus(PayrollStatus status);
 }

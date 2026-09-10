@@ -56,7 +56,7 @@ public class CheckIn {
     private CheckInMethod method = CheckInMethod.QR_DYNAMIC;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private CheckInResult result;
 
     @ManyToOne(fetch = FetchType.LAZY)

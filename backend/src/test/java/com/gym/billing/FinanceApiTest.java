@@ -236,7 +236,7 @@ class FinanceApiTest {
         return given().contentType(ContentType.JSON).body(req)
                 .when().post("/auth/login")
                 .then().statusCode(200)
-                .extract().path("token");
+                .extract().path("accessToken");
     }
 
     private void doiVaiTro(String sdt, String role) {

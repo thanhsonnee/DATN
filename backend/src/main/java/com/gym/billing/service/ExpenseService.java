@@ -6,6 +6,7 @@ import com.gym.billing.api.dto.ProfitLossReportResponse;
 import com.gym.billing.domain.Expense;
 import com.gym.billing.domain.ExpenseCategory;
 import com.gym.billing.domain.ExpenseStatus;
+import com.gym.billing.domain.PaymentStatus;
 import com.gym.billing.repository.ExpenseRepository;
 import com.gym.billing.repository.PaymentRepository;
 import com.gym.billing.repository.PayrollItemRepository;
@@ -23,7 +24,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -113,7 +114,7 @@ public class ExpenseService {
         OffsetDateTime toTime = endOfMonth.atTime(23, 59, 59).atOffset(ZoneOffset.ofHours(7));
 
         // 1. Doanh thu
-        BigDecimal cashRev = paymentRepo.sumCollectedBetween(fromTime, toTime);
+        BigDecimal cashRev = paymentRepo.sumCollectedBetween(PaymentStatus.SUCCEEDED, fromTime, toTime);
         if (cashRev == null) cashRev = BigDecimal.ZERO;
 
         BigDecimal accrualRev = scheduleRepo.sumRecognizedBetween(startOfMonth, endOfMonth);
@@ -134,7 +135,7 @@ public class ExpenseService {
         BigDecimal netAccrual = accrualRev.subtract(totalExp);
 
         // 5. Chi tiết theo danh mục chi phí
-        Map<String, BigDecimal> breakdown = new HashMap<>();
+        Map<String, BigDecimal> breakdown = new LinkedHashMap<>();
         List<Object[]> rows = expenseRepo.sumByCategoryBetween(startOfMonth, endOfMonth);
         for (Object[] r : rows) {
             if (r[0] != null && r[1] != null) {

@@ -56,6 +56,12 @@ public class CodeGenerator {
         return String.format("PAYROLL-%d-%02d-%03d", year, month, nextVal("payroll_code_seq"));
     }
 
+    /** Ví dụ: {@code EM-100} — mã in trên thẻ nhân viên, sinh khi Admin tạo tài khoản. */
+    @Transactional
+    public String nextEmployeeCode() {
+        return String.format("EM-%03d", nextVal("employee_code_seq"));
+    }
+
     private long nextVal(String sequenceName) {
         return ((Number) em.createNativeQuery("SELECT nextval('" + sequenceName + "')")
                 .getSingleResult()).longValue();

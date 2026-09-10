@@ -23,6 +23,7 @@ export interface MeResponse {
 
 export interface TokenResponse {
   accessToken: string
+  refreshToken: string
   tokenType: string
   expiresIn: number
   user: MeResponse
@@ -70,6 +71,8 @@ export interface Registration {
   packageType: PackageType
   durationDays: number | null
   sessionsTotal: number | null
+  /** Đọc sống từ bảng giá hiện tại, không snapshot vào hợp đồng. */
+  maxFreezeDays: number
   listPrice: number
   discountAmount: number
   discountReason: string | null

@@ -107,19 +107,24 @@ public class BillingService {
      */
     @Transactional
     public RegistrationResponse xacNhanGoiTap(Long registrationId, Long actorUserId,
-                                              PaymentMethod hinhThuc) {
+                                              PaymentMethod hinhThuc, BigDecimal soTienThu) {
         Invoice inv = invoiceRepo.findByRegistrationIdAndDeletedAtIsNull(registrationId).orElse(null);
 
         Long invoiceId;
-        BigDecimal soTien;
+        BigDecimal conNo;
         if (inv == null) {
             InvoiceResponse created = xuatHoaDon(registrationId, actorUserId, LocalDate.now());
             invoiceId = created.id();
-            soTien = created.totalAmount();
+            conNo = created.totalAmount();
         } else {
             invoiceId = inv.getId();
-            soTien = inv.getTotalAmount().subtract(inv.getPaidAmount());
+            conNo = inv.getTotalAmount().subtract(inv.getPaidAmount());
         }
+
+        // Không nhập số tiền = thu ĐỦ (hành vi mặc định cho lễ tân bấm nhanh khi
+        // khách trả đủ). Nhập ít hơn để demo/ghi nhận cọc trước — thuTien() tự
+        // để hóa đơn ở PARTIALLY_PAID và KHÔNG kích hoạt hợp đồng khi chưa đủ.
+        BigDecimal soTien = soTienThu != null ? soTienThu : conNo;
 
         thuTien(invoiceId, soTien, hinhThuc, actorUserId, null);
         return registrationService.getById(registrationId);
@@ -322,7 +327,7 @@ public class BillingService {
             throw ApiException.badRequest("INVALID_AMOUNT", "Số tiền đếm được không hợp lệ");
         }
 
-        BigDecimal thuTrongCa = paymentRepo.tongTienMatTrongCa(ca.getId());
+        BigDecimal thuTrongCa = paymentRepo.tongTienMatTrongCa(ca.getId(), PaymentStatus.SUCCEEDED);
         BigDecimal phaiCo = ca.getOpeningBalance().add(thuTrongCa).setScale(2, RoundingMode.HALF_UP);
         BigDecimal demDuoc = tienDemDuoc.setScale(2, RoundingMode.HALF_UP);
 
@@ -362,6 +367,24 @@ public class BillingService {
                 .stream().map(InvoiceResponse::from).toList();
     }
 
+    /**
+     * Hủy hóa đơn khi hợp đồng gắn với nó bị hủy tự động (bỏ ngang chưa thanh toán).
+     *
+     * <p>Chỉ hủy hóa đơn CHƯA thu đồng nào. Nếu khách đã cọc một phần thì để kế
+     * toán xử lý tay (hoàn tiền có lý do, có người duyệt) — không tự động xóa dấu
+     * vết một khoản tiền đã thực sự về túi phòng gym.
+     */
+    @Transactional
+    public void huyHoaDonTheoHopDong(Long registrationId) {
+        invoiceRepo.findByRegistrationIdAndDeletedAtIsNull(registrationId).ifPresent(inv -> {
+            if (inv.getStatus() == InvoiceStatus.UNPAID) {
+                inv.setStatus(InvoiceStatus.CANCELLED);
+                log.info("Hủy hóa đơn {} do hợp đồng bị hủy tự động (bỏ ngang chưa thanh toán)",
+                        inv.getInvoiceNo());
+            }
+        });
+    }
+
     @Transactional(readOnly = true)
     public List<InvoiceResponse> congNo() {
         return invoiceRepo.findByStatusInAndDeletedAtIsNullOrderByDueDateAsc(
@@ -389,7 +412,7 @@ public class BillingService {
         Employee nv = nhanVienCuaTaiKhoan(actorUserId);
         return shiftRepo.findByEmployeeIdAndStatus(nv.getId(), CashShiftStatus.OPEN)
                 .map(ca -> {
-                    BigDecimal thuTrongCa = paymentRepo.tongTienMatTrongCa(ca.getId());
+                    BigDecimal thuTrongCa = paymentRepo.tongTienMatTrongCa(ca.getId(), PaymentStatus.SUCCEEDED);
                     BigDecimal expected = ca.getOpeningBalance().add(thuTrongCa).setScale(2, RoundingMode.HALF_UP);
                     return new CashShiftResponse(
                             ca.getId(),

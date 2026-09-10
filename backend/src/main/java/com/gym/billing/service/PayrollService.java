@@ -4,6 +4,7 @@ import com.gym.billing.api.dto.CalculatePayrollRequest;
 import com.gym.billing.api.dto.PayrollItemResponse;
 import com.gym.billing.api.dto.PayrollRunResponse;
 import com.gym.billing.api.dto.UpdatePayrollItemRequest;
+import com.gym.billing.domain.PaymentStatus;
 import com.gym.billing.domain.PayrollItem;
 import com.gym.billing.domain.PayrollRun;
 import com.gym.billing.domain.PayrollStatus;
@@ -17,6 +18,7 @@ import com.gym.identity.domain.Employee;
 import com.gym.identity.domain.User;
 import com.gym.identity.repository.EmployeeRepository;
 import com.gym.identity.repository.UserRepository;
+import com.gym.settings.service.SystemSettingService;
 import com.gym.training.repository.PtSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +56,7 @@ public class PayrollService {
     private final PtSessionRepository ptSessionRepo;
     private final PaymentRepository paymentRepo;
     private final CodeGenerator codeGenerator;
+    private final SystemSettingService settings;
 
     /**
      * Tính toán bảng lương nháp cho một tháng.
@@ -90,9 +93,7 @@ public class PayrollService {
         OffsetDateTime fromTime = startOfMonth.atStartOfDay().atOffset(ZoneOffset.ofHours(7));
         OffsetDateTime toTime = endOfMonth.atTime(23, 59, 59).atOffset(ZoneOffset.ofHours(7));
 
-        List<Employee> employees = employeeRepo.findAll().stream()
-                .filter(e -> e.getDeletedAt() == null)
-                .toList();
+        List<Employee> employees = employeeRepo.findByDeletedAtIsNull();
 
         BigDecimal totalBase = BigDecimal.ZERO;
         BigDecimal totalCommission = BigDecimal.ZERO;
@@ -114,22 +115,29 @@ public class PayrollService {
             int ptCount = 0;
             BigDecimal ptCommission = BigDecimal.ZERO;
             if (emp.getDepartment() == Department.TRAINING) {
+                BigDecimal hoaHongPtMoiBuoi = settings.getBigDecimal(
+                        "payroll.pt-commission-per-session", BigDecimal.valueOf(100_000L));
                 long completed = ptSessionRepo.countCompletedSessionsByTrainerBetween(emp.getId(), fromTime, toTime);
                 ptCount = (int) completed;
-                ptCommission = BigDecimal.valueOf(ptCount * 100_000L).setScale(2, RoundingMode.HALF_UP);
+                ptCommission = hoaHongPtMoiBuoi.multiply(BigDecimal.valueOf(ptCount))
+                        .setScale(2, RoundingMode.HALF_UP);
             }
             item.setPtSessionsCount(ptCount);
             item.setPtCommission(ptCommission);
 
             // 2. Hoa hồng Sales / Lễ tân
+            // TODO: định nghĩa quy tắc đếm hợp đồng sale — salesContractsCount tạm để 0,
+            // hoa hồng vẫn tính đúng theo % doanh số thu được (không phụ thuộc số này).
             int salesCount = 0;
             BigDecimal salesCommission = BigDecimal.ZERO;
             if (emp.getDepartment() == Department.SALES || emp.getDepartment() == Department.FRONT_DESK) {
                 var userOpt = userRepo.findByPersonIdAndDeletedAtIsNull(emp.getPerson().getId());
                 if (userOpt.isPresent()) {
-                    BigDecimal collected = paymentRepo.sumCollectedByUserBetween(userOpt.get().getId(), fromTime, toTime);
+                    BigDecimal collected = paymentRepo.sumCollectedByUserBetween(userOpt.get().getId(), PaymentStatus.SUCCEEDED, fromTime, toTime);
                     if (collected != null && collected.compareTo(BigDecimal.ZERO) > 0) {
-                        salesCommission = collected.multiply(new BigDecimal("0.05")).setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal tyLeHoaHongSales = settings.getBigDecimal(
+                                "payroll.sales-commission-rate", new BigDecimal("0.05"));
+                        salesCommission = collected.multiply(tyLeHoaHongSales).setScale(2, RoundingMode.HALF_UP);
                     }
                 }
             }
@@ -186,6 +194,7 @@ public class PayrollService {
         if (req.note() != null) {
             item.setNote(req.note());
         }
+        item.setManuallyEdited(true);
 
         BigDecimal net = item.getBaseSalary()
                 .add(item.getPtCommission())
@@ -256,6 +265,7 @@ public class PayrollService {
         }
 
         run.setStatus(PayrollStatus.PAID);
+        userRepo.findById(actorUserId).ifPresent(run::setPaidBy);
         run.setPaidAt(OffsetDateTime.now());
 
         run = payrollRunRepo.save(run);

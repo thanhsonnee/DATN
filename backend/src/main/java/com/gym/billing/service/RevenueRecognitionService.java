@@ -134,7 +134,7 @@ public class RevenueRecognitionService {
         OffsetDateTime fromTime = startOfMonth.atStartOfDay().atOffset(ZoneOffset.ofHours(7));
         OffsetDateTime toTime = endOfMonth.atTime(23, 59, 59).atOffset(ZoneOffset.ofHours(7));
 
-        BigDecimal cashCollected = paymentRepo.sumCollectedBetween(fromTime, toTime);
+        BigDecimal cashCollected = paymentRepo.sumCollectedBetween(PaymentStatus.SUCCEEDED, fromTime, toTime);
         BigDecimal accrualRecognized = scheduleRepo.sumRecognizedBetween(startOfMonth, endOfMonth);
         BigDecimal deferredRevenue = scheduleRepo.sumPendingBetween(startOfMonth, endOfMonth);
 

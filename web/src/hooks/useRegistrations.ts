@@ -41,6 +41,8 @@ export interface MuaGoiInput {
   membershipId: number
   discountAmount?: number
   discountReason?: string
+  /** Hợp đồng đang gia hạn tiếp nối — gói mới sẽ bắt đầu ngay sau khi hợp đồng này hết hạn. */
+  renewFromRegistrationId?: number
 }
 
 export interface DeskRegisterInput {

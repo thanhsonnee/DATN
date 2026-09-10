@@ -13,8 +13,6 @@ public interface PayrollItemRepository extends JpaRepository<PayrollItem, Long> 
 
     List<PayrollItem> findByPayrollRunId(Long payrollRunId);
 
-    Optional<PayrollItem> findByPayrollRunIdAndEmployeeId(Long payrollRunId, Long employeeId);
-
     @Query("SELECT pi FROM PayrollItem pi JOIN pi.payrollRun pr " +
            "WHERE pi.employee.id = :employeeId AND pr.periodMonth = :month AND pr.periodYear = :year " +
            "AND pr.status IN ('APPROVED', 'PAID')")

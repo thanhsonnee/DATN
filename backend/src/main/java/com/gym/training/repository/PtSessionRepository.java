@@ -15,6 +15,9 @@ public interface PtSessionRepository extends JpaRepository<PtSession, Long> {
 
     List<PtSession> findByTrainerIdAndDeletedAtIsNullOrderByScheduledStartDesc(Long trainerId);
 
+    /** Dùng để kiểm tra trùng lịch — lọc giao nhau về thời gian thực hiện ở tầng service. */
+    List<PtSession> findByTrainerIdAndStatusAndDeletedAtIsNull(Long trainerId, SessionStatus status);
+
     List<PtSession> findByRegistrationIdAndDeletedAtIsNull(Long registrationId);
 
     /**

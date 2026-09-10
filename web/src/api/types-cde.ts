@@ -158,6 +158,15 @@ export interface MemberSearchResult {
   fullName: string
   phone: string
   status: string
+  photoKey: string | null
+}
+
+export interface MemberPhotoResponse {
+  memberId: number
+  memberCode: string
+  fullName: string
+  photoKey: string
+  photoUrl: string
 }
 
 export interface Trainer {
@@ -231,8 +240,10 @@ export interface PayrollRun {
   createdByName: string | null
   approvedByName: string | null
   approvedAt: string | null
+  paidByName: string | null
   paidAt: string | null
   note: string | null
+  hasManualEdits: boolean
   items: PayrollItem[]
 }
 
@@ -319,6 +330,109 @@ export interface FunnelStats {
   stageCounts: Record<string, number>
   lostReasonCounts: Record<string, number>
   conversionRate: number
+}
+
+// ------------------------------------------------------------ phản hồi & thiết bị (H)
+
+export type EquipmentStatus = 'ACTIVE' | 'NEEDS_REPAIR' | 'UNDER_REPAIR' | 'RETIRED'
+
+export interface Equipment {
+  id: number
+  name: string
+  roomName: string | null
+  status: EquipmentStatus
+  note: string | null
+}
+
+export type FeedbackType = 'TRAINER' | 'FACILITY' | 'HYGIENE' | 'SERVICE' | 'GENERAL'
+
+export type FeedbackStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'RESOLVED' | 'CLOSED'
+
+export interface Feedback {
+  id: number
+  memberId: number
+  memberName: string
+  feedbackType: FeedbackType
+  trainerId: number | null
+  trainerName: string | null
+  equipmentId: number | null
+  equipmentName: string | null
+  rating: number | null
+  description: string
+  status: FeedbackStatus
+  urgent: boolean
+  repairCost: number | null
+  resolutionNote: string | null
+  resolvedByName: string | null
+  resolvedAt: string | null
+  createdAt: string
+}
+
+// ------------------------------------------------------------ Quản trị (Admin)
+
+/** 4 vai trò Admin tạo được tài khoản thay — KHÔNG bao gồm ADMIN/MEMBER. */
+export type EmployeeRole = 'TRAINER' | 'SALE' | 'RECEPTIONIST' | 'ACCOUNTANT'
+
+export type Department = 'TRAINING' | 'SALES' | 'FRONT_DESK' | 'ACCOUNTING'
+
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'FREELANCE'
+
+export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'RESIGNED'
+
+export interface EmployeeAccount {
+  employeeId: number
+  userId: number
+  employeeCode: string
+  username: string
+  fullName: string
+  role: EmployeeRole
+  department: Department
+  /** Chỉ có trong response TẠO tài khoản — không xem lại được sau khi rời trang. */
+  tempPassword: string
+}
+
+export interface EmployeeSummary {
+  id: number
+  employeeCode: string
+  fullName: string
+  phone: string
+  email: string | null
+  department: Department
+  position: string | null
+  status: EmployeeStatus
+  startDate: string
+}
+
+export interface AdminMembersOverview {
+  activeCount: number
+  newThisMonthCount: number
+  expiringSoonCount: number
+  frozenCount: number
+}
+
+export interface AdminRevenueOverview {
+  cashCollectedThisMonth: number
+  accrualRecognizedThisMonth: number
+  deferredRevenueThisMonth: number
+  unpaidOverdueAmount: number
+  unpaidOverdueCount: number
+}
+
+export interface AdminOperationsToday {
+  checkInsToday: number
+  deniedToday: number
+  openCashShifts: number
+  cashShiftDiscrepancies: number
+  openFeedbacksCount: number
+  urgentFeedbacksCount: number
+  equipmentNeedsRepairCount: number
+  draftPayrollRunsCount: number
+}
+
+export interface AdminDashboard {
+  membersOverview: AdminMembersOverview
+  revenueOverview: AdminRevenueOverview
+  operationsToday: AdminOperationsToday
 }
 
 

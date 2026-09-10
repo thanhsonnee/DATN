@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMemberships } from '@/hooks/useMemberships'
 import { useMuaGoi } from '@/hooks/useRegistrations'
 import { useAuth } from '@/stores/auth'
@@ -19,6 +19,10 @@ export function BangGiaPage() {
   const navigate = useNavigate()
   const muaGoi = useMuaGoi()
 
+  const [searchParams] = useSearchParams()
+  const renewFromRegistrationId = searchParams.get('renewFrom')
+    ? Number(searchParams.get('renewFrom')) : undefined
+
   const [dangChon, setDangChon] = useState<Membership | null>(null)
   const [ketQua, setKetQua] = useState<string | null>(null)
 
@@ -30,7 +34,7 @@ export function BangGiaPage() {
   const xacNhanMua = () => {
     if (!dangChon) return
     muaGoi.mutate(
-      { membershipId: dangChon.id },
+      { membershipId: dangChon.id, renewFromRegistrationId },
       {
         onSuccess: (hopDong) => {
           setDangChon(null)
@@ -51,6 +55,13 @@ export function BangGiaPage() {
           Giá và chương trình khuyến mãi đều công khai — không cần liên hệ để hỏi giá.
         </p>
       </div>
+
+      {renewFromRegistrationId != null && (
+        <Alert tone="info">
+          Đang gia hạn từ hợp đồng #{renewFromRegistrationId} — gói mới sẽ tự động bắt đầu ngay
+          sau khi gói hiện tại kết thúc, không bị chồng ngày hay mất ngày còn lại.
+        </Alert>
+      )}
 
       {ketQua && <Alert tone="success">{ketQua}</Alert>}
 

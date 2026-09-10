@@ -54,39 +54,20 @@ public class LeadService {
     @Transactional
     public LeadResponse createLead(CreateLeadRequest req, Long actorUserId) {
         String phone = req.phone().trim();
-        Person person = personRepo.findByPhoneAndDeletedAtIsNull(phone)
-                .orElseGet(() -> {
-                    Person p = new Person();
-                    p.setFullName(req.fullName().trim());
-                    p.setPhone(phone);
-                    if (req.email() != null && !req.email().isBlank()) {
-                        p.setEmail(req.email().trim());
-                    }
-                    return personRepo.save(p);
-                });
+        Person person = findOrCreatePersonByPhone(phone, req.fullName(), req.email());
 
-        // Kiểm tra xem khách này đã có lead đang mở chưa
-        List<Lead> openLeads = leadRepo.findByPersonIdAndStageNotInAndDeletedAtIsNull(
-                person.getId(), List.of(LeadStage.WON, LeadStage.LOST));
-
-        Lead lead;
-        if (!openLeads.isEmpty()) {
-            lead = openLeads.get(0);
-            log.info("Khách {} đã có lead mở #{}, cập nhật thông tin", phone, lead.getId());
-        } else {
-            lead = new Lead();
-            lead.setPerson(person);
-            lead.setSource(req.source());
-            lead.setStage(LeadStage.NEW);
-        }
+        Lead lead = findOrCreateLead(person, req.source());
 
         if (req.interestedMembershipId() != null) {
-            Membership m = membershipRepo.findById(req.interestedMembershipId()).orElse(null);
+            Membership m = membershipRepo.findById(req.interestedMembershipId())
+                    .orElseThrow(() -> ApiException.notFound("Không tìm thấy gói tập quan tâm"));
             lead.setInterestedMembership(m);
         }
 
         if (req.assignedToEmployeeId() != null) {
-            Employee emp = employeeRepo.findById(req.assignedToEmployeeId()).orElse(null);
+            Employee emp = employeeRepo.findById(req.assignedToEmployeeId())
+                    .filter(e -> e.getDeletedAt() == null)
+                    .orElseThrow(() -> ApiException.notFound("Không tìm thấy nhân viên"));
             lead.setAssignedTo(emp);
         } else if (actorUserId != null && lead.getAssignedTo() == null) {
             // Tự động gán cho Sale đang đăng nhập nếu người đó thuộc phòng Sales
@@ -118,29 +99,8 @@ public class LeadService {
     @Transactional
     public LeadResponse publicCreateLead(PublicLeadRequest req) {
         String phone = req.phone().trim();
-        Person person = personRepo.findByPhoneAndDeletedAtIsNull(phone)
-                .orElseGet(() -> {
-                    Person p = new Person();
-                    p.setFullName(req.fullName().trim());
-                    p.setPhone(phone);
-                    if (req.email() != null && !req.email().isBlank()) {
-                        p.setEmail(req.email().trim());
-                    }
-                    return personRepo.save(p);
-                });
-
-        List<Lead> openLeads = leadRepo.findByPersonIdAndStageNotInAndDeletedAtIsNull(
-                person.getId(), List.of(LeadStage.WON, LeadStage.LOST));
-
-        Lead lead;
-        if (!openLeads.isEmpty()) {
-            lead = openLeads.get(0);
-        } else {
-            lead = new Lead();
-            lead.setPerson(person);
-            lead.setSource(LeadSource.WEB_FORM);
-            lead.setStage(LeadStage.NEW);
-        }
+        Person person = findOrCreatePersonByPhone(phone, req.fullName(), req.email());
+        Lead lead = findOrCreateLead(person, LeadSource.WEB_FORM);
 
         if (req.interestedMembershipId() != null) {
             membershipRepo.findById(req.interestedMembershipId()).ifPresent(lead::setInterestedMembership);
@@ -334,5 +294,37 @@ public class LeadService {
         return leadRepo.findById(id)
                 .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy khách hàng tiềm năng"));
+    }
+
+    /** Tìm Person theo SĐT, tạo mới nếu chưa có — chống trùng khách hàng giữa các kênh tiếp nhận. */
+    private Person findOrCreatePersonByPhone(String phone, String fullName, String email) {
+        return personRepo.findByPhoneAndDeletedAtIsNull(phone)
+                .orElseGet(() -> {
+                    Person p = new Person();
+                    p.setFullName(fullName.trim());
+                    p.setPhone(phone);
+                    if (email != null && !email.isBlank()) {
+                        p.setEmail(email.trim());
+                    }
+                    return personRepo.save(p);
+                });
+    }
+
+    /** Dùng lại lead đang mở (chưa WON/LOST) của khách nếu có, không thì tạo lead mới. */
+    private Lead findOrCreateLead(Person person, LeadSource source) {
+        List<Lead> openLeads = leadRepo.findByPersonIdAndStageNotInAndDeletedAtIsNull(
+                person.getId(), List.of(LeadStage.WON, LeadStage.LOST));
+
+        if (!openLeads.isEmpty()) {
+            Lead lead = openLeads.get(0);
+            log.info("Khách {} đã có lead mở #{}, dùng lại", person.getPhone(), lead.getId());
+            return lead;
+        }
+
+        Lead lead = new Lead();
+        lead.setPerson(person);
+        lead.setSource(source);
+        lead.setStage(LeadStage.NEW);
+        return lead;
     }
 }

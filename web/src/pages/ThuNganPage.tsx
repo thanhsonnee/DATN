@@ -22,6 +22,9 @@ import type { PaymentMethod, ExpenseCategory, PayrollRun } from '@/api/types-cde
 
 type TabType = 'THU_NGAN' | 'DOANH_THU' | 'BANG_LUONG' | 'CHI_PHI'
 
+/** Danh sách năm cho các bộ lọc kỳ báo cáo/lương/chi phí. */
+const CAC_NAM_CHON = [2025, 2026, 2027]
+
 /** Màn hình Quản lý Tài chính & Thu ngân (Phân đoạn E1 - E5). */
 export function ThuNganPage() {
   const [tab, setTab] = useState<TabType>('THU_NGAN')
@@ -421,7 +424,7 @@ function TabDoanhThuDonTich() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
           >
-            {[2025, 2026, 2027].map((y) => (
+            {CAC_NAM_CHON.map((y) => (
               <option key={y} value={y}>Năm {y}</option>
             ))}
           </select>
@@ -570,7 +573,7 @@ function TabBangLuong() {
               onChange={(e) => setCalcYear(Number(e.target.value))}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
             >
-              {[2025, 2026, 2027].map((y) => (
+              {CAC_NAM_CHON.map((y) => (
                 <option key={y} value={y}>Năm {y}</option>
               ))}
             </select>
@@ -578,7 +581,17 @@ function TabBangLuong() {
 
           <Button
             loading={calculatePayroll.isPending}
-            onClick={() => calculatePayroll.mutate({ periodMonth: calcMonth, periodYear: calcYear })}
+            onClick={() => {
+              const runHienCo = runs?.find((r) => r.periodMonth === calcMonth && r.periodYear === calcYear)
+              if (runHienCo?.hasManualEdits) {
+                const dongY = window.confirm(
+                  `Bảng lương tháng ${calcMonth}/${calcYear} đã có dòng được chỉnh thưởng/phạt thủ công. ` +
+                  'Tính lại sẽ XÓA các chỉnh sửa đó. Bạn có chắc muốn tiếp tục?'
+                )
+                if (!dongY) return
+              }
+              calculatePayroll.mutate({ periodMonth: calcMonth, periodYear: calcYear })
+            }}
           >
             📊 Tính lương tự động (DRAFT)
           </Button>
@@ -771,15 +784,18 @@ function HopThoaiSuaLuong({
   const [bonus, setBonus] = useState(String(item?.bonusAmount ?? 0))
   const [deduction, setDeduction] = useState(String(item?.deductionAmount ?? 0))
   const [note, setNote] = useState(item?.note ?? '')
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const handleSave = () => {
+    const bonusAmount = Number(bonus)
+    const deductionAmount = Number(deduction)
+    if (bonusAmount < 0 || deductionAmount < 0) {
+      setValidationError('Tiền thưởng và khấu trừ không được âm')
+      return
+    }
+    setValidationError(null)
     updateItem.mutate(
-      {
-        itemId,
-        bonusAmount: Number(bonus),
-        deductionAmount: Number(deduction),
-        note: note || undefined,
-      },
+      { itemId, bonusAmount, deductionAmount, note: note || undefined },
       { onSuccess: onClose }
     )
   }
@@ -805,6 +821,9 @@ function HopThoaiSuaLuong({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Thưởng chuyên cần / Phạt đi muộn..."
         />
+
+        {validationError && <Alert tone="error">{validationError}</Alert>}
+        {updateItem.error instanceof ApiError && <Alert tone="error">{updateItem.error.message}</Alert>}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>Hủy</Button>
@@ -851,7 +870,7 @@ function TabChiPhiVaLoiNhuan() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
           >
-            {[2025, 2026, 2027].map((y) => (
+            {CAC_NAM_CHON.map((y) => (
               <option key={y} value={y}>Năm {y}</option>
             ))}
           </select>
@@ -907,6 +926,9 @@ function TabChiPhiVaLoiNhuan() {
           action={<Badge tone="red">{expenses?.length ?? 0} khoản chi</Badge>}
         />
         <CardBody className="p-0">
+          {deleteExpense.error instanceof ApiError && (
+            <div className="p-4"><Alert tone="error">{deleteExpense.error.message}</Alert></div>
+          )}
           {!expenses || expenses.length === 0 ? (
             <EmptyState title="Chưa có khoản chi nào được ghi nhận" />
           ) : (
@@ -938,7 +960,11 @@ function TabChiPhiVaLoiNhuan() {
                       <td className="px-5 py-3 text-xs text-slate-500">{e.spentByName ?? '—'}</td>
                       <td className="px-5 py-3 text-right">
                         <button
-                          onClick={() => deleteExpense.mutate(e.id)}
+                          onClick={() => {
+                            if (window.confirm(`Xóa khoản chi "${e.title}" (${tien(e.amount)})? Không thể hoàn tác.`)) {
+                              deleteExpense.mutate(e.id)
+                            }
+                          }}
                           className="text-xs text-red-600 hover:text-red-800 font-semibold"
                         >
                           Xóa

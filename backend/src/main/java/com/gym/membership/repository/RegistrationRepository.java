@@ -64,4 +64,13 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
          + "  AND r.endDate BETWEEN :from AND :to "
          + "ORDER BY r.endDate ASC")
     List<Registration> findExpiringBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** Dùng cho dashboard Admin: đếm hợp đồng theo trạng thái (vd. FROZEN). */
+    long countByStatusAndDeletedAtIsNull(RegistrationStatus status);
+
+    /** Số hội viên PHÂN BIỆT đang có hợp đồng hiệu lực — "hội viên đang hoạt động" thật sự. */
+    @Query("SELECT COUNT(DISTINCT r.member.id) FROM Registration r "
+         + "WHERE r.status = com.gym.membership.domain.RegistrationStatus.ACTIVE "
+         + "  AND r.deletedAt IS NULL")
+    long countDistinctActiveMembers();
 }

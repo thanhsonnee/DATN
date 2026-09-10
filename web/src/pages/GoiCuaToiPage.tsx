@@ -12,7 +12,7 @@ import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
 import {
   ngay, soNgayConLai, tien, tenLoaiGoi,
-  tenTrangThaiBaoLuu, tenTrangThaiHopDong,
+  tenTrangThaiBaoLuu, tenTrangThaiHopDong, truNgay,
 } from '@/lib/format'
 import type { Registration } from '@/api/types'
 
@@ -60,6 +60,8 @@ function TheHopDong({ hopDong, onXinBaoLuu }: {
   const chiTrongMotNgay = hopDong.startDate === hopDong.endDate
   // Mỗi hợp đồng chỉ được bảo lưu MỘT lần — đã dùng thì ẩn nút đi
   const chuaTungBaoLuu = hopDong.freeze === null
+  // Vé lẻ, gói 1 tháng... không cho bảo lưu (maxFreezeDays = 0 trong bảng giá) — ẩn hẳn nút
+  const goiChoBaoLuu = hopDong.maxFreezeDays > 0
 
   return (
     <Card>
@@ -124,16 +126,24 @@ function TheHopDong({ hopDong, onXinBaoLuu }: {
             <p className="mt-0.5 text-blue-700">
               Trạng thái: {tenTrangThaiBaoLuu(hopDong.freeze.status)} · {hopDong.freeze.reason}
             </p>
+            {/* Chỉ tính lại hạn cũ khi bảo lưu ĐÃ được duyệt — PENDING/REJECTED thì endDate chưa hề đổi */}
+            {!['PENDING', 'REJECTED'].includes(hopDong.freeze.status)
+              && hopDong.endDate && hopDong.freeze.days && (
+              <p className="mt-1 text-blue-900">
+                Hạn cũ: {ngay(truNgay(hopDong.endDate, hopDong.freeze.days))}
+                {' '}→ Hạn mới: <b>{ngay(hopDong.endDate)}</b>
+              </p>
+            )}
           </div>
         )}
 
         <div className="flex justify-end gap-2">
           {(hopDong.status === 'COMPLETED' || (dangChay && conLai !== null && conLai <= 14)) && (
-            <Link to="/">
+            <Link to={`/?renewFrom=${hopDong.id}`}>
               <Button variant="primary">Gia hạn gói tập</Button>
             </Link>
           )}
-          {dangChay && chuaTungBaoLuu && (
+          {dangChay && chuaTungBaoLuu && goiChoBaoLuu && (
             <Button variant="secondary" onClick={onXinBaoLuu}>Xin bảo lưu</Button>
           )}
         </div>
@@ -164,6 +174,8 @@ function HopThoaiBaoLuu({ hopDong, onClose }: {
     if (!hopDong) return
     xinBaoLuu.mutate({ id: hopDong.id, ...form }, { onSuccess: onClose })
   }
+
+  const hopLe = form.fromDate.trim() !== '' && form.toDate.trim() !== '' && form.reason.trim() !== ''
 
   return (
     <Modal open={!!hopDong} title="Xin bảo lưu gói tập" onClose={onClose}>
@@ -199,12 +211,16 @@ function HopThoaiBaoLuu({ hopDong, onClose }: {
                placeholder="Đi công tác nước ngoài 1 tháng" />
 
         {xinBaoLuu.error instanceof ApiError && (
-          <Alert tone="error">{xinBaoLuu.error.message}</Alert>
+          <Alert tone="error">
+            {xinBaoLuu.error.fields
+              ? Object.values(xinBaoLuu.error.fields).join(', ')
+              : xinBaoLuu.error.message}
+          </Alert>
         )}
 
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Hủy</Button>
-          <Button onClick={gui} loading={xinBaoLuu.isPending}>Gửi yêu cầu</Button>
+          <Button onClick={gui} loading={xinBaoLuu.isPending} disabled={!hopLe}>Gửi yêu cầu</Button>
         </div>
       </div>
     </Modal>

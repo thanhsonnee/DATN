@@ -50,15 +50,18 @@ function useLamMoiBilling() {
 }
 
 /**
- * Một lần bấm cho lễ tân: xác nhận đã thu tiền (mặt hoặc chuyển khoản), hợp
- * đồng TỰ kích hoạt. Gộp xuất hóa đơn + thu tiền phía sau, lễ tân không cần
- * biết tới khái niệm "hóa đơn".
+ * Một lần bấm cho lễ tân: xác nhận đã thu tiền (mặt hoặc chuyển khoản). Gộp
+ * xuất hóa đơn + thu tiền phía sau, lễ tân không cần biết tới khái niệm "hóa
+ * đơn". Bỏ trống `amount` = thu ĐỦ, hợp đồng TỰ kích hoạt (mặc định thường
+ * dùng). Nhập ít hơn giá trị hợp đồng = thu cọc trước — hợp đồng CHƯA kích
+ * hoạt, chuyển sang hiện ở "Công nợ" để thu tiếp phần còn lại.
  */
 export function useXacNhanGoiTap() {
   const lamMoi = useLamMoiBilling()
   return useMutation({
-    mutationFn: ({ registrationId, method }: { registrationId: number; method: PaymentMethod }) =>
-      api.post<Registration>(`/billing/registrations/${registrationId}/confirm`, { method }),
+    mutationFn: ({ registrationId, method, amount }: {
+      registrationId: number; method: PaymentMethod; amount?: number
+    }) => api.post<Registration>(`/billing/registrations/${registrationId}/confirm`, { method, amount }),
     onSuccess: lamMoi,
   })
 }

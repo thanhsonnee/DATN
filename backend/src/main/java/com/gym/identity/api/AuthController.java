@@ -46,6 +46,17 @@ public class AuthController {
         return authService.refresh(req.refreshToken());
     }
 
+    @Operation(summary = "Đăng xuất",
+            description = "Thu hồi refresh token THẬT SỰ ở server (tăng token_version) — khác "
+                        + "với việc chỉ xóa token phía trình duyệt. Sau khi gọi, mọi refresh "
+                        + "token đã phát hành trước đó ở mọi thiết bị/tab đều bị từ chối ngay "
+                        + "từ lần /refresh kế tiếp, không cần đợi hết hạn 30 ngày.")
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal Long userId) {
+        authService.logout(userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Thông tin tài khoản đang đăng nhập")
     @GetMapping("/me")
     public MeResponse me(@AuthenticationPrincipal Long userId) {

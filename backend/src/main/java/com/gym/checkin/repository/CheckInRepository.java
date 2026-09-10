@@ -41,4 +41,13 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     List<Object[]> thongKeTheoKetQua(@Param("tuNgay") OffsetDateTime tuNgay);
 
     long countByResultAndCheckedInAtAfter(CheckInResult result, OffsetDateTime tuNgay);
+
+    /** Tổng lượt quét (cho vào lẫn bị chặn) từ một mốc thời gian — dùng cho dashboard Admin. */
+    long countByCheckedInAtAfter(OffsetDateTime tuNgay);
+
+    /** Lượt bị chặn (mọi lý do DENIED_*) từ một mốc thời gian. */
+    @Query("SELECT COUNT(c) FROM CheckIn c WHERE c.checkedInAt >= :tuNgay "
+         + "  AND c.result NOT IN (com.gym.checkin.domain.CheckInResult.ALLOWED, "
+         + "                       com.gym.checkin.domain.CheckInResult.ALLOWED_OVERRIDE)")
+    long countBiTuChoiAfter(@Param("tuNgay") OffsetDateTime tuNgay);
 }

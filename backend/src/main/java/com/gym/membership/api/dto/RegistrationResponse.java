@@ -18,6 +18,8 @@ public record RegistrationResponse(
         String packageType,
         Integer durationDays,
         Integer sessionsTotal,
+        /** Đọc SỐNG từ bảng giá hiện tại, không snapshot — sửa bảng giá là đổi ngay cả hợp đồng cũ. */
+        Integer maxFreezeDays,
         BigDecimal listPrice,
         BigDecimal discountAmount,
         String discountReason,
@@ -52,6 +54,7 @@ public record RegistrationResponse(
                 r.getMember().getPerson().getFullName(),
                 r.getMembership().getId(), r.getMembership().getName(),
                 r.getPackageType().name(), r.getDurationDays(), r.getSessionsTotal(),
+                r.getMembership().getMaxFreezeDays(),
                 r.getListPrice(), r.getDiscountAmount(), r.getDiscountReason(), r.getFinalPrice(),
                 r.getContractDate(), r.getStartDate(), r.getEndDate(), r.getActivatedAt(),
                 r.getStatus().name(), freeze);

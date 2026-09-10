@@ -16,6 +16,12 @@ import { ManHinhQuayPage } from '@/pages/ManHinhQuayPage'
 import { ThuNganPage } from '@/pages/ThuNganPage'
 import { ThongKePage } from '@/pages/ThongKePage'
 import { BanHangPage } from '@/pages/BanHangPage'
+import { PhanHoiPage } from '@/pages/PhanHoiPage'
+import { QuanLyPhanHoiPage } from '@/pages/QuanLyPhanHoiPage'
+import { DanhGiaCuaToiPage } from '@/pages/DanhGiaCuaToiPage'
+import { TuCheckInPage } from '@/pages/TuCheckInPage'
+import { AdminDashboardPage } from '@/pages/AdminDashboardPage'
+import { QuanLyNhanVienPage } from '@/pages/QuanLyNhanVienPage'
 
 export default function App() {
   const { user, loading, restore } = useAuth()
@@ -42,11 +48,19 @@ export default function App() {
         <Route path="/goi-cua-toi" element={canDangNhap(<GoiCuaToiPage />)} />
         <Route path="/buoi-tap" element={canDangNhap(<BuoiTapPage />)} />
         <Route path="/tai-khoan" element={canDangNhap(<TaiKhoanPage />)} />
+        <Route path="/phan-hoi"
+               element={canQuyen(<PhanHoiPage />, ['MEMBER'])} />
+        <Route path="/check-in"
+               element={canQuyen(<TuCheckInPage />, ['MEMBER'])} />
 
+        <Route path="/quan-ly-phan-hoi"
+               element={canQuyen(<QuanLyPhanHoiPage />, ['RECEPTIONIST', 'ADMIN'])} />
         <Route path="/ban-hang"
                element={canQuyen(<BanHangPage />, ['SALE', 'RECEPTIONIST', 'ADMIN'])} />
         <Route path="/lich-day"
                element={canQuyen(<LichDayPage />, ['TRAINER', 'ADMIN'])} />
+        <Route path="/danh-gia-cua-toi"
+               element={canQuyen(<DanhGiaCuaToiPage />, ['TRAINER', 'ADMIN'])} />
         <Route path="/quay"
                element={canQuyen(<ManHinhQuayPage />, ['RECEPTIONIST', 'ADMIN'])} />
         <Route path="/thu-ngan"
@@ -56,6 +70,10 @@ export default function App() {
                         ['SALE', 'RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'])} />
         <Route path="/thong-ke"
                element={canQuyen(<ThongKePage />, ['ADMIN', 'ACCOUNTANT'])} />
+        <Route path="/quan-tri"
+               element={canQuyen(<AdminDashboardPage />, ['ADMIN'])} />
+        <Route path="/quan-tri/nhan-vien"
+               element={canQuyen(<QuanLyNhanVienPage />, ['ADMIN'])} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

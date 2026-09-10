@@ -26,4 +26,22 @@ public class MemberController {
     public List<MemberSearchResult> timKiem(@RequestParam String q) {
         return memberLookupService.timKiem(q);
     }
+
+    @Operation(summary = "Tải ảnh chân dung khuôn mặt cho hội viên",
+            description = "Lễ tân/Admin tải ảnh chụp hoặc tải file ảnh chân dung cho hội viên để đối chiếu khi check-in.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @PostMapping(value = "/{memberId}/photo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public org.springframework.http.ResponseEntity<com.gym.identity.api.dto.MemberPhotoResponse> uploadPhoto(
+            @PathVariable Long memberId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return org.springframework.http.ResponseEntity.ok(memberLookupService.uploadPhoto(memberId, file));
+    }
+
+    @Operation(summary = "Xóa ảnh chân dung của hội viên",
+            description = "Dùng khi lễ tân trót tải nhầm ảnh, xóa để tải lại ảnh đúng.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @DeleteMapping("/{memberId}/photo")
+    public com.gym.identity.api.dto.MemberPhotoResponse deletePhoto(@PathVariable Long memberId) {
+        return memberLookupService.deletePhoto(memberId);
+    }
 }

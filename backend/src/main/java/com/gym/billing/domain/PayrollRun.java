@@ -62,6 +62,10 @@ public class PayrollRun {
     @Column(name = "approved_at")
     private OffsetDateTime approvedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "paid_by")
+    private User paidBy;
+
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 

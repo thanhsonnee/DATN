@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePendingPaymentRegistrations, useDeskRegister } from '@/hooks/useRegistrations'
 import { useXacNhanGoiTap } from '@/hooks/useBilling'
 import { useMemberships } from '@/hooks/useMemberships'
@@ -31,6 +31,12 @@ export function ChoThanhToan() {
   const { data: dsChoThanhToan, isLoading } = usePendingPaymentRegistrations()
   const [xacNhanCho, setXacNhanCho] = useState<Registration | null>(null)
   const [moModalDangKy, setMoModalDangKy] = useState(false)
+  const [thongBaoThanhCong, setThongBaoThanhCong] = useState<string | null>(null)
+
+  const baoThanhCong = (thongBao: string) => {
+    setThongBaoThanhCong(thongBao)
+    setTimeout(() => setThongBaoThanhCong(null), 5000)
+  }
 
   return (
     <Card>
@@ -46,6 +52,9 @@ export function ChoThanhToan() {
           </div>
         }
       />
+      {thongBaoThanhCong && (
+        <div className="px-5 pt-4"><Alert tone="success">{thongBaoThanhCong}</Alert></div>
+      )}
       <CardBody className="p-0">
         {isLoading ? (
           <Spinner />
@@ -69,22 +78,56 @@ export function ChoThanhToan() {
         )}
       </CardBody>
 
-      <HopThoaiXacNhan hopDong={xacNhanCho} onClose={() => setXacNhanCho(null)} />
-      <HopThoaiDangKyTaiQuay open={moModalDangKy} onClose={() => setMoModalDangKy(false)} />
+      <HopThoaiXacNhan
+        hopDong={xacNhanCho}
+        onClose={() => setXacNhanCho(null)}
+        onThanhCong={(ten) => baoThanhCong(`Đã xác nhận gói tập cho ${ten}, hợp đồng kích hoạt ngay.`)}
+      />
+      <HopThoaiDangKyTaiQuay
+        open={moModalDangKy}
+        onClose={() => setMoModalDangKy(false)}
+        onThanhCong={(ten) => baoThanhCong(`Đã đăng ký thành công cho ${ten}.`)}
+      />
     </Card>
   )
 }
 
-function HopThoaiXacNhan({ hopDong, onClose }: {
+function HopThoaiXacNhan({ hopDong, onClose, onThanhCong }: {
   hopDong: Registration | null
   onClose: () => void
+  onThanhCong: (tenHoiVien: string) => void
 }) {
   const xacNhan = useXacNhanGoiTap()
   const [hinhThuc, setHinhThuc] = useState<PaymentMethod>('CASH')
+  const [soTien, setSoTien] = useState('')
+
+  // Mỗi lần mở modal cho MỘT hợp đồng khác thì xóa số tiền đã gõ lần trước —
+  // tránh số tiền cọc của hợp đồng cũ bị gán nhầm sang hợp đồng đang mở.
+  useEffect(() => { setSoTien('') }, [hopDong?.id])
+
+  const gia = hopDong ? Number(hopDong.finalPrice) : 0
+  const soTienThu = soTien.trim() === '' ? gia : Number(soTien)
+  const laThuCoc = soTienThu > 0 && soTienThu < gia
 
   const gui = () => {
     if (!hopDong) return
-    xacNhan.mutate({ registrationId: hopDong.id, method: hinhThuc }, { onSuccess: onClose })
+    const loiXacNhan = laThuCoc
+      ? `Xác nhận thu cọc ${tien(soTienThu)} cho ${hopDong.memberName} (${hopDong.membershipName})?`
+      : `Xác nhận đã nhận đủ ${tien(soTienThu)} cho ${hopDong.memberName} (${hopDong.membershipName})? ` +
+        'Hợp đồng sẽ kích hoạt ngay sau khi xác nhận.'
+    if (!window.confirm(loiXacNhan)) return
+    xacNhan.mutate(
+      { registrationId: hopDong.id, method: hinhThuc, amount: soTienThu },
+      {
+        onSuccess: () => {
+          onThanhCong(laThuCoc
+            ? `Đã ghi nhận cọc ${tien(soTienThu)} cho ${hopDong.memberName}, còn nợ ${tien(gia - soTienThu)}.`
+            : `Đã xác nhận gói tập cho ${hopDong.memberName}, hợp đồng kích hoạt ngay.`)
+          onClose()
+          setSoTien('')
+        },
+      },
+    )
   }
 
   return (
@@ -99,6 +142,15 @@ function HopThoaiXacNhan({ hopDong, onClose }: {
           </div>
         )}
 
+        <Input
+          label="Số tiền đã nhận"
+          type="number"
+          value={soTien}
+          onChange={(e) => setSoTien(e.target.value)}
+          placeholder={String(gia)}
+          hint="Bỏ trống = thu đủ. Nhập ít hơn để ghi nhận thu cọc trước."
+        />
+
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">
             Đã nhận tiền bằng hình thức
@@ -110,9 +162,16 @@ function HopThoaiXacNhan({ hopDong, onClose }: {
           </select>
         </div>
 
-        <Alert tone="info">
-          Xác nhận xong hợp đồng <b>tự kích hoạt</b> ngay — hội viên vào tập được luôn.
-        </Alert>
+        {laThuCoc ? (
+          <Alert tone="info">
+            Chỉ thu <b>{tien(soTienThu)}</b> trong tổng {tien(gia)} — hợp đồng <b>chưa kích hoạt</b>,
+            sẽ hiện lại ở "Công nợ" để thu tiếp <b>{tien(gia - soTienThu)}</b> còn lại.
+          </Alert>
+        ) : (
+          <Alert tone="info">
+            Xác nhận xong hợp đồng <b>tự kích hoạt</b> ngay — hội viên vào tập được luôn.
+          </Alert>
+        )}
 
         {xacNhan.error instanceof ApiError && <Alert tone="error">{xacNhan.error.message}</Alert>}
 
@@ -125,9 +184,10 @@ function HopThoaiXacNhan({ hopDong, onClose }: {
   )
 }
 
-function HopThoaiDangKyTaiQuay({ open, onClose }: {
+function HopThoaiDangKyTaiQuay({ open, onClose, onThanhCong }: {
   open: boolean
   onClose: () => void
+  onThanhCong: (tenKhach: string) => void
 }) {
   const { data: goiTap } = useMemberships()
   const deskRegister = useDeskRegister()
@@ -163,6 +223,7 @@ function HopThoaiDangKyTaiQuay({ open, onClose }: {
       paymentMethod: payNow ? paymentMethod : undefined,
     }, {
       onSuccess: () => {
+        onThanhCong(fullName)
         setFullName('')
         setPhone('')
         setEmail('')

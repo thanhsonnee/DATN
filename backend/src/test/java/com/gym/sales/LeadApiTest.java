@@ -139,6 +139,13 @@ class LeadApiTest {
                 .body("stageCounts.TRIAL_BOOKED", equalTo(1));
 
         // 5. Khách chốt hợp đồng tại quầy -> Lead TỰ ĐỘNG chuyển sang WON
+        // Thu tiền mặt bắt buộc phải có ca làm việc đang mở
+        given().header(auth(tokenLeTan))
+                .contentType(ContentType.JSON)
+                .body(Map.of("openingBalance", 500_000))
+                .when().post("/billing/cash-shifts/open")
+                .then().statusCode(201);
+
         Long pkgId = jdbc.queryForObject("SELECT id FROM memberships WHERE code = 'FIT-06M'", Long.class);
         given().header(auth(tokenLeTan))
                 .contentType(ContentType.JSON)
@@ -184,7 +191,7 @@ class LeadApiTest {
         return given().contentType(ContentType.JSON).body(req)
                 .when().post("/auth/login")
                 .then().statusCode(200)
-                .extract().path("token");
+                .extract().path("accessToken");
     }
 
     private void doiVaiTro(String sdt, String role) {
