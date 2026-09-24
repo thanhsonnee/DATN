@@ -26,6 +26,25 @@ export function truNgay(iso: string, soNgay: number): string {
   return `${y}-${m}-${day}`
 }
 
+/** Ngày hôm nay dạng ISO theo giờ địa phương — tránh lệch ngày do quy đổi UTC. */
+export function ngayHomNay(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Cộng thêm N ngày vào một mốc ISO. */
+export function congNgay(iso: string, soNgay: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + soNgay)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Số ngày còn lại tính tới ngày hết hạn. Âm nghĩa là đã quá hạn. */
 export function soNgayConLai(endDate: string | null): number | null {
   if (!endDate) return null

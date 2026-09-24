@@ -6,12 +6,13 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Badge, tonesForRegistration } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
 import {
-  ngay, soNgayConLai, tien, tenLoaiGoi,
+  congNgay, ngay, ngayHomNay, soNgayConLai, tien, tenLoaiGoi,
   tenTrangThaiBaoLuu, tenTrangThaiHopDong, truNgay,
 } from '@/lib/format'
 import type { Registration } from '@/api/types'
@@ -177,19 +178,28 @@ function HopThoaiBaoLuu({ hopDong, onClose }: {
 
   const hopLe = form.fromDate.trim() !== '' && form.toDate.trim() !== '' && form.reason.trim() !== ''
 
+  // Không cho chọn ngày trong quá khứ, và phải nằm trước hạn hợp đồng
+  const fromMin = ngayHomNay()
+  const fromMax = hopDong?.endDate ? truNgay(hopDong.endDate, 1) : undefined
+  // "Đến ngày" phải sau "từ ngày" và không vượt quá số ngày bảo lưu tối đa của gói
+  const toMin = form.fromDate || fromMin
+  const toMax = hopDong && form.fromDate
+    ? congNgay(form.fromDate, hopDong.maxFreezeDays - 1)
+    : undefined
+
   return (
     <Modal open={!!hopDong} title="Xin bảo lưu gói tập" onClose={onClose}>
       <div className="space-y-4">
         <Alert tone="info">
-          Mỗi hợp đồng chỉ được bảo lưu <b>một lần</b>. Ngày hết hạn sẽ được đẩy lùi
-          đúng bằng số ngày bảo lưu, bạn không mất ngày đã trả tiền.
+          Mỗi hợp đồng chỉ được bảo lưu <b>một lần</b>{hopDong && ` (tối đa ${hopDong.maxFreezeDays} ngày)`}.
+          Ngày hết hạn sẽ được đẩy lùi đúng bằng số ngày bảo lưu, bạn không mất ngày đã trả tiền.
         </Alert>
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Từ ngày" type="date" value={form.fromDate}
-                 onChange={(e) => setForm({ ...form, fromDate: e.target.value })} />
-          <Input label="Đến ngày" type="date" value={form.toDate}
-                 onChange={(e) => setForm({ ...form, toDate: e.target.value })} />
+          <DatePicker label="Từ ngày" value={form.fromDate} min={fromMin} max={fromMax}
+                      onChange={(v) => setForm({ ...form, fromDate: v, toDate: '' })} />
+          <DatePicker label="Đến ngày" value={form.toDate} min={toMin} max={toMax}
+                      onChange={(v) => setForm({ ...form, toDate: v })} />
         </div>
 
         <div>
