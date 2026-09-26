@@ -11,14 +11,14 @@ interface MucMenu {
 }
 
 const MENU: MucMenu[] = [
-  { to: '/goi-cua-toi', nhan: 'Gói của tôi' },
-  { to: '/buoi-tap', nhan: 'Buổi tập' },
+  { to: '/goi-cua-toi', nhan: 'Gói của tôi', vaiTro: ['MEMBER'] },
+  { to: '/buoi-tap', nhan: 'Buổi tập', vaiTro: ['MEMBER'] },
   { to: '/check-in', nhan: 'Check-in', vaiTro: ['MEMBER'] },
   { to: '/phan-hoi', nhan: 'Phản hồi', vaiTro: ['MEMBER'] },
   { to: '/quan-ly-phan-hoi', nhan: 'Xử lý phản hồi', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
   { to: '/ban-hang', nhan: 'Bán hàng (CRM)', vaiTro: ['SALE', 'RECEPTIONIST', 'ADMIN'] },
-  { to: '/lich-day', nhan: 'Lịch dạy', vaiTro: ['TRAINER', 'ADMIN'] },
-  { to: '/danh-gia-cua-toi', nhan: 'Đánh giá về tôi', vaiTro: ['TRAINER', 'ADMIN'] },
+  { to: '/lich-day', nhan: 'Lịch dạy', vaiTro: ['TRAINER'] },
+  { to: '/danh-gia-cua-toi', nhan: 'Đánh giá về tôi', vaiTro: ['TRAINER'] },
   { to: '/quay', nhan: 'Màn hình quầy', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
   { to: '/thu-ngan', nhan: 'Thu ngân', vaiTro: ['RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'] },
   { to: '/quan-ly', nhan: 'Hợp đồng', vaiTro: ['SALE', 'RECEPTIONIST', 'ACCOUNTANT', 'ADMIN'] },
@@ -50,7 +50,9 @@ export function Layout() {
           </Link>
 
           <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
-            <NavLink to="/" end className={linkClass}>Bảng giá</NavLink>
+            {(!user || user.role === 'MEMBER') && (
+              <NavLink to="/" end className={linkClass}>Bảng giá</NavLink>
+            )}
             {menuHienThi.map((m) => (
               <NavLink key={m.to} to={m.to} className={linkClass}>{m.nhan}</NavLink>
             ))}

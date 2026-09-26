@@ -45,8 +45,10 @@ export default function App() {
         <Route path="/dang-nhap" element={user ? <Navigate to="/" replace /> : <DangNhapPage />} />
         <Route path="/dang-ky" element={user ? <Navigate to="/" replace /> : <DangKyPage />} />
 
-        <Route path="/goi-cua-toi" element={canDangNhap(<GoiCuaToiPage />)} />
-        <Route path="/buoi-tap" element={canDangNhap(<BuoiTapPage />)} />
+        <Route path="/goi-cua-toi"
+               element={canQuyen(<GoiCuaToiPage />, ['MEMBER'])} />
+        <Route path="/buoi-tap"
+               element={canQuyen(<BuoiTapPage />, ['MEMBER'])} />
         <Route path="/tai-khoan" element={canDangNhap(<TaiKhoanPage />)} />
         <Route path="/phan-hoi"
                element={canQuyen(<PhanHoiPage />, ['MEMBER'])} />
@@ -58,9 +60,9 @@ export default function App() {
         <Route path="/ban-hang"
                element={canQuyen(<BanHangPage />, ['SALE', 'RECEPTIONIST', 'ADMIN'])} />
         <Route path="/lich-day"
-               element={canQuyen(<LichDayPage />, ['TRAINER', 'ADMIN'])} />
+               element={canQuyen(<LichDayPage />, ['TRAINER'])} />
         <Route path="/danh-gia-cua-toi"
-               element={canQuyen(<DanhGiaCuaToiPage />, ['TRAINER', 'ADMIN'])} />
+               element={canQuyen(<DanhGiaCuaToiPage />, ['TRAINER'])} />
         <Route path="/quay"
                element={canQuyen(<ManHinhQuayPage />, ['RECEPTIONIST', 'ADMIN'])} />
         <Route path="/thu-ngan"
