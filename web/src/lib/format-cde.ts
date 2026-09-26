@@ -93,6 +93,8 @@ export function tenKetQuaCheckIn(result: string): string {
     DENIED_UNPAID: 'Chặn — chưa thanh toán/kích hoạt',
     DENIED_NOT_FOUND: 'Chặn — không tìm thấy',
     DENIED_SUSPECT: 'Chặn — nghi vấn',
+    DENIED_ALREADY_INSIDE: 'Chặn — đang trong phòng',
+    DENIED_MANUAL: 'Lễ tân từ chối',
   }
   return map[result] ?? result
 }

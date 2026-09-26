@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
-import { tien, ngay } from '@/lib/format'
+import { tien, ngay, ghiChuNoiGoiTuDong } from '@/lib/format'
 import { tenHinhThucThanhToan } from '@/lib/format-cde'
 import type { PaymentMethod } from '@/api/types-cde'
 import type { Registration } from '@/api/types'
@@ -86,7 +86,9 @@ export function ChoThanhToan() {
       <HopThoaiDangKyTaiQuay
         open={moModalDangKy}
         onClose={() => setMoModalDangKy(false)}
-        onThanhCong={(ten) => baoThanhCong(`Đã đăng ký thành công cho ${ten}.`)}
+        onThanhCong={(ten, hopDong) =>
+          baoThanhCong(`Đã đăng ký thành công cho ${ten}.` + ghiChuNoiGoiTuDong(hopDong))
+        }
       />
     </Card>
   )
@@ -170,6 +172,7 @@ function HopThoaiXacNhan({ hopDong, onClose, onThanhCong }: {
         ) : (
           <Alert tone="info">
             Xác nhận xong hợp đồng <b>tự kích hoạt</b> ngay — hội viên vào tập được luôn.
+            {hopDong && ghiChuNoiGoiTuDong(hopDong)}
           </Alert>
         )}
 
@@ -187,7 +190,7 @@ function HopThoaiXacNhan({ hopDong, onClose, onThanhCong }: {
 function HopThoaiDangKyTaiQuay({ open, onClose, onThanhCong }: {
   open: boolean
   onClose: () => void
-  onThanhCong: (tenKhach: string) => void
+  onThanhCong: (tenKhach: string, hopDong: Registration) => void
 }) {
   const { data: goiTap } = useMemberships()
   const deskRegister = useDeskRegister()
@@ -222,8 +225,8 @@ function HopThoaiDangKyTaiQuay({ open, onClose, onThanhCong }: {
       payNow,
       paymentMethod: payNow ? paymentMethod : undefined,
     }, {
-      onSuccess: () => {
-        onThanhCong(fullName)
+      onSuccess: (hopDong) => {
+        onThanhCong(fullName, hopDong)
         setFullName('')
         setPhone('')
         setEmail('')

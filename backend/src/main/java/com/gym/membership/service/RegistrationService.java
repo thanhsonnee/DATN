@@ -71,7 +71,9 @@ public class RegistrationService {
         BigDecimal discount = validateDiscount(req.discountAmount(), req.discountReason(), pkg.getPrice());
         Registration r = buildRegistration(member, pkg, discount, req.discountReason(), req.note(),
                 req.assignedTrainerId(), actorUserId);
-        r.setRenewFrom(resolveRenewFrom(req.renewFromRegistrationId(), member));
+        r.setRenewFrom(req.renewFromRegistrationId() != null
+                ? resolveRenewFrom(req.renewFromRegistrationId(), member)
+                : autoChainRenewFrom(member, pkg.getPackageType()));
 
         r = registrationRepo.save(r);
         log.info("Hợp đồng mới: {} - hội viên {} - gói {} - {} đ",
@@ -104,6 +106,27 @@ public class RegistrationService {
                     "Hợp đồng gốc chưa từng kích hoạt, chưa có ngày hết hạn để nối tiếp");
         }
         return cu;
+    }
+
+    /** Trạng thái còn "sống", chưa xong việc — dùng để tìm hợp đồng nối gói tự động. */
+    private static final List<RegistrationStatus> TRANG_THAI_CON_HIEU_LUC = List.of(
+            RegistrationStatus.PENDING_PAYMENT, RegistrationStatus.ACTIVE, RegistrationStatus.FROZEN);
+
+    /**
+     * Khách mua thêm một gói CÙNG LOẠI (vd. đang tập gói tháng, mua thêm gói tháng
+     * khác) trong lúc gói cũ còn sống thì tự động nối gói mới vào ngay sau gói cũ,
+     * y hệt cơ chế gia hạn thủ công — không bắt khách/nhân viên phải tự chọn
+     * "gia hạn từ hợp đồng nào". Nhờ vậy hai hợp đồng không bao giờ chạy chồng
+     * ngày lên nhau, và khách không phải trả tiền cho những ngày dùng trùng.
+     *
+     * <p>Khác gói (vd. gói tháng mua thêm gói PT theo buổi) thì không đụng vào
+     * nhau — hai loại đó vốn dùng song song bình thường.
+     */
+    private Registration autoChainRenewFrom(Member member, PackageType packageType) {
+        return registrationRepo
+                .findFirstByMemberIdAndPackageTypeAndStatusInAndDeletedAtIsNullOrderByIdDesc(
+                        member.getId(), packageType, TRANG_THAI_CON_HIEU_LUC)
+                .orElse(null);
     }
 
     /**
@@ -147,6 +170,7 @@ public class RegistrationService {
         BigDecimal discount = validateDiscount(req.discountAmount(), req.discountReason(), pkg.getPrice());
         Registration r = buildRegistration(member, pkg, discount, req.discountReason(), req.note(),
                 req.assignedTrainerId(), actorUserId);
+        r.setRenewFrom(autoChainRenewFrom(member, pkg.getPackageType()));
 
         r = registrationRepo.save(r);
         log.info("Hợp đồng đăng ký tại quầy: {} - hội viên {} - gói {} - {} đ",
@@ -183,6 +207,14 @@ public class RegistrationService {
             throw ApiException.badRequest("INVALID_STATE",
                     "Chỉ kích hoạt được hợp đồng đang chờ thanh toán. Trạng thái hiện tại: "
                             + r.getStatus());
+        }
+        // Hợp đồng nối tiếp (tự động hoặc gia hạn thủ công) mà hợp đồng gốc CHƯA
+        // từng kích hoạt thì chưa có endDate để tính ngày bắt đầu — phải xử lý
+        // (thu tiền/kích hoạt) hợp đồng gốc trước, đúng thứ tự mua.
+        if (r.getRenewFrom() != null && r.getRenewFrom().getEndDate() == null) {
+            throw ApiException.badRequest("RENEW_SOURCE_NOT_ACTIVATED",
+                    "Hợp đồng trước đó (" + r.getRenewFrom().getRegistrationCode()
+                            + ") chưa được kích hoạt/thanh toán, cần xử lý lần lượt theo đúng thứ tự mua");
         }
 
         LocalDate start = ngayBatDauKichHoat(r);

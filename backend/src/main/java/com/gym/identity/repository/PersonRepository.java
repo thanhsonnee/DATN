@@ -12,4 +12,6 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     boolean existsByPhoneAndDeletedAtIsNull(String phone);
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
+
+    Optional<Person> findByEmailAndDeletedAtIsNull(String email);
 }

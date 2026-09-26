@@ -24,6 +24,6 @@ public interface RevenueScheduleRepository extends JpaRepository<RevenueSchedule
     BigDecimal sumRecognizedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("SELECT COALESCE(SUM(rs.amount), 0) FROM RevenueSchedule rs " +
-           "WHERE rs.status = 'PENDING' AND rs.scheduleDate BETWEEN :from AND :to")
-    BigDecimal sumPendingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+           "WHERE rs.status = 'PENDING' AND rs.scheduleDate > :asOf")
+    BigDecimal sumPendingAfter(@Param("asOf") LocalDate asOf);
 }

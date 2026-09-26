@@ -25,6 +25,20 @@ export function useTrainers() {
   })
 }
 
+/**
+ * Huấn luyện viên còn rảnh trong khung giờ đã chọn — dùng khi hội viên chọn
+ * ngày/giờ TRƯỚC khi chọn huấn luyện viên. Chỉ gọi khi đã có đủ start/end.
+ */
+export function useAvailableTrainers(start: string | null, end: string | null) {
+  return useQuery({
+    queryKey: ['trainers', 'available', start, end],
+    queryFn: () => api.get<Trainer[]>(
+      `/pt-sessions/available-trainers?start=${encodeURIComponent(start!)}&end=${encodeURIComponent(end!)}`,
+    ),
+    enabled: !!start && !!end,
+  })
+}
+
 /** Tải lên ảnh chân dung khuôn mặt cho hội viên (Lễ tân/Admin). */
 export function useUploadMemberPhoto() {
   const qc = useQueryClient()

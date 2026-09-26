@@ -51,6 +51,17 @@ public class AdminEmployeeService {
             throw ApiException.badRequest("INVALID_ROLE",
                     "Chỉ tạo được tài khoản cho vai trò TRAINER, SALE, RECEPTIONIST hoặc ACCOUNTANT");
         }
+        // level chỉ có ý nghĩa với PT — đây là cờ mà PtSessionService/EmployeeLookupService
+        // dùng để lọc "PT thật" khi hiển thị danh sách chọn huấn luyện viên. Thiếu bước
+        // này thì PT vừa tạo sẽ không bao giờ xuất hiện ở màn đặt lịch của hội viên.
+        if (req.role() == UserRole.TRAINER && req.level() == null) {
+            throw ApiException.badRequest("LEVEL_REQUIRED",
+                    "Vui lòng chọn bậc huấn luyện viên (Junior/Senior/Master)");
+        }
+        if (req.role() != UserRole.TRAINER && req.level() != null) {
+            throw ApiException.badRequest("LEVEL_NOT_ALLOWED",
+                    "Chỉ huấn luyện viên mới có bậc — vai trò này không áp dụng");
+        }
         if (personRepo.existsByPhoneAndDeletedAtIsNull(req.phone())) {
             throw ApiException.conflict("PHONE_TAKEN", "Số điện thoại này đã được đăng ký");
         }
@@ -85,6 +96,7 @@ public class AdminEmployeeService {
         employee.setEmployeeCode(codeGenerator.nextEmployeeCode());
         employee.setDepartment(mapDepartment(req.role()));
         employee.setPosition(req.position());
+        employee.setLevel(req.level());
         employee.setEmploymentType(req.employmentType());
         employee.setBaseSalary(req.baseSalary());
         employee.setStartDate(req.startDate() != null ? req.startDate() : LocalDate.now());

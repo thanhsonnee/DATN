@@ -43,6 +43,11 @@ public class SecurityConfig {
                             "/api/v1/auth/forgot-password",
                             "/api/v1/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/memberships/**").permitAll()
+                    // TODO: ManHinhQuayPage.tsx (web) render ảnh bằng thẻ <img> thuần — trình duyệt
+                    // không gắn header Authorization cho request đó (token đang ở localStorage,
+                    // không phải cookie). Bắt buộc đăng nhập ở đây sẽ làm vỡ màn hình quầy lễ tân.
+                    // Cần đổi cách tải ảnh ở FE (fetch có token -> blob URL, hoặc short-lived
+                    // signed query token) trước khi siết endpoint này lại.
                     .requestMatchers(HttpMethod.GET, "/api/v1/files/photos/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/leads/public").permitAll()
                     // Tài liệu API

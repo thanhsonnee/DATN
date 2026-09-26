@@ -57,10 +57,16 @@ export function useHangDoiChoXacNhan() {
   })
 }
 
-export function useBoQuaYeuCau() {
+/**
+ * Lễ tân TỪ CHỐI một yêu cầu tự check-in, bắt buộc kèm lý do — ghi lại một lượt
+ * DENIED_MANUAL thật (không chỉ xóa khỏi hàng đợi) để app hội viên biết chắc là bị
+ * từ chối, thay vì lỡ hiện nhầm "Đã xác nhận — mời vào tập".
+ */
+export function useTuChoiYeuCau() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (memberId: number) => api.delete<void>(`/check-ins/pending-requests/${memberId}`),
+    mutationFn: ({ memberId, lyDo }: { memberId: number; lyDo: string }) =>
+      api.post<CheckInResult>(`/check-ins/pending-requests/${memberId}/reject`, { lyDo }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['check-ins', 'pending-requests'] }),
   })
 }

@@ -83,6 +83,11 @@ export interface Registration {
   activatedAt: string | null
   status: RegistrationStatus
   freeze: FreezeInfo | null
+  /** Hợp đồng cùng loại gói được nối tiếp (tự động hoặc gia hạn thủ công). `null` nếu đây là gói độc lập. */
+  renewFromRegistrationId: number | null
+  renewFromRegistrationCode: string | null
+  /** `null` nếu hợp đồng gốc chưa từng kích hoạt (chưa có ngày hết hạn để nối vào). */
+  renewFromEndDate: string | null
 }
 
 /** Định dạng lỗi thống nhất do backend trả về. */

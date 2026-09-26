@@ -1,5 +1,6 @@
 package com.gym.membership.repository;
 
+import com.gym.membership.domain.PackageType;
 import com.gym.membership.domain.Registration;
 import com.gym.membership.domain.RegistrationStatus;
 import jakarta.persistence.LockModeType;
@@ -9,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,6 +50,18 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
      * {@code members.status} vì là dữ liệu suy ra được (quyết định 14).
      */
     boolean existsByMemberIdAndStatusAndDeletedAtIsNull(Long memberId, RegistrationStatus status);
+
+    /**
+     * Hợp đồng CÙNG LOẠI GÓI gần nhất của hội viên, còn "sống" (chưa xong/hủy/hoàn tiền).
+     *
+     * <p>Vì mỗi hợp đồng mới cùng loại đều tự nối vào hợp đồng còn sống gần nhất
+     * tại thời điểm nó được tạo, hợp đồng còn sống có id LỚN NHẤT luôn chính là
+     * đuôi hiện tại của chuỗi — không cần dò ngược từng bước qua {@code renewFrom}.
+     * Dùng để tự động gia hạn nối tiếp khi khách mua thêm gói trùng loại, tránh
+     * hai gói cùng loại chạy chồng ngày lên nhau.
+     */
+    Optional<Registration> findFirstByMemberIdAndPackageTypeAndStatusInAndDeletedAtIsNullOrderByIdDesc(
+            Long memberId, PackageType packageType, Collection<RegistrationStatus> statuses);
 
     /** Danh sách hợp đồng ACTIVE đã quá ngày hết hạn để xử lý A5. */
     List<Registration> findByStatusAndDeletedAtIsNullAndEndDateBefore(

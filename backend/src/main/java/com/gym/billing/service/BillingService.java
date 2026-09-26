@@ -144,7 +144,10 @@ public class BillingService {
     public PaymentResponse thuTien(Long invoiceId, BigDecimal soTien, PaymentMethod hinhThuc,
                            Long actorUserId, String noiDungChuyenKhoan) {
 
-        Invoice inv = invoiceRepo.findById(invoiceId)
+        // Khóa dòng hóa đơn ngay từ đầu: nếu không, hai khoản thu đồng thời đều có
+        // thể đọc cùng số nợ còn lại trước khi khoản kia kịp ghi, nên mỗi khoản
+        // riêng lẻ đều qua được chặn OVERPAY dưới đây dù cộng lại đã vượt số nợ thật.
+        Invoice inv = invoiceRepo.khoaHoaDon(invoiceId)
                 .filter(x -> x.getDeletedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy hóa đơn"));
 

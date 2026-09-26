@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
 import { ngay } from '@/lib/format'
-import type { EmployeeAccount, EmployeeRole, EmploymentType } from '@/api/types-cde'
+import type { EmployeeAccount, EmployeeRole, EmploymentType, TrainerLevel } from '@/api/types-cde'
 
 const TEN_VAI_TRO: Record<EmployeeRole, string> = {
   TRAINER: 'Huấn luyện viên',
@@ -18,11 +18,18 @@ const TEN_VAI_TRO: Record<EmployeeRole, string> = {
   ACCOUNTANT: 'Kế toán',
 }
 
+const TEN_BAC_PT: Record<TrainerLevel, string> = {
+  JUNIOR: 'Junior',
+  SENIOR: 'Senior',
+  MASTER: 'Master',
+}
+
 const TEN_PHONG_BAN: Record<string, string> = {
   TRAINING: 'Huấn luyện',
   SALES: 'Kinh doanh',
   FRONT_DESK: 'Lễ tân',
   ACCOUNTING: 'Kế toán',
+  MANAGEMENT: 'Quản lý',
 }
 
 /**
@@ -104,18 +111,20 @@ function HopThoaiTaoTaiKhoan({ open, onClose, onCreated }: {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<EmployeeRole>('TRAINER')
   const [position, setPosition] = useState('')
+  const [level, setLevel] = useState<TrainerLevel | ''>('')
   const [employmentType, setEmploymentType] = useState<EmploymentType | ''>('')
   const [baseSalary, setBaseSalary] = useState('')
   const [startDate, setStartDate] = useState('')
 
   const resetForm = () => {
     setFullName(''); setPhone(''); setEmail(''); setRole('TRAINER')
-    setPosition(''); setEmploymentType(''); setBaseSalary(''); setStartDate('')
+    setPosition(''); setLevel(''); setEmploymentType(''); setBaseSalary(''); setStartDate('')
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!fullName || !phone) return
+    if (role === 'TRAINER' && !level) return
 
     createAccount.mutate(
       {
@@ -124,6 +133,7 @@ function HopThoaiTaoTaiKhoan({ open, onClose, onCreated }: {
         email: email.trim() || undefined,
         role,
         position: position.trim() || undefined,
+        level: role === 'TRAINER' ? (level || undefined) : undefined,
         employmentType: employmentType || undefined,
         baseSalary: baseSalary ? Number(baseSalary) : undefined,
         startDate: startDate || undefined,
@@ -170,6 +180,24 @@ function HopThoaiTaoTaiKhoan({ open, onClose, onCreated }: {
             ))}
           </select>
         </div>
+
+        {role === 'TRAINER' && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Bậc huấn luyện viên *</label>
+            <select value={level}
+                    onChange={(e) => setLevel(e.target.value as TrainerLevel | '')}
+                    required
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="">-- Chọn bậc --</option>
+              {(Object.keys(TEN_BAC_PT) as TrainerLevel[]).map((l) => (
+                <option key={l} value={l}>{TEN_BAC_PT[l]}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Bắt buộc chọn — PT không có bậc sẽ không hiển thị ở màn hội viên đặt lịch tập.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input label="Chức danh (tùy chọn)" value={position}

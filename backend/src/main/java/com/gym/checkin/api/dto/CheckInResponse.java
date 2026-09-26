@@ -67,6 +67,7 @@ public record CheckInResponse(
             case "DENIED_UNPAID"    -> "Chưa thanh toán / Chưa kích hoạt — vui lòng thu tiền trước khi vào tập";
             case "DENIED_SUSPECT"   -> "Hội viên bị hạn chế — yêu cầu xuất trình giấy tờ";
             case "DENIED_ALREADY_INSIDE" -> "Hội viên đang ở trong phòng tập — kiểm tra lại trước khi cho vào lần nữa";
+            case "DENIED_MANUAL" -> "Lễ tân đã từ chối yêu cầu vào tập";
             default -> "Không xác định được, kiểm tra lại";
         };
     }

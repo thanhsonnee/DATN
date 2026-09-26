@@ -136,7 +136,11 @@ public class RevenueRecognitionService {
 
         BigDecimal cashCollected = paymentRepo.sumCollectedBetween(PaymentStatus.SUCCEEDED, fromTime, toTime);
         BigDecimal accrualRecognized = scheduleRepo.sumRecognizedBetween(startOfMonth, endOfMonth);
-        BigDecimal deferredRevenue = scheduleRepo.sumPendingBetween(startOfMonth, endOfMonth);
+        // Doanh thu nhận trước = tiền đã thu nhưng CHƯA đến hạn ghi nhận, tức các
+        // kỳ PENDING rơi vào các tháng SAU tháng báo cáo — không phải PENDING
+        // trong chính tháng này (những kỳ đó chỉ còn vài ngày cuối tháng chưa tới
+        // hạn, luôn xấp xỉ 0 nên không phản ánh đúng số dư doanh thu nhận trước).
+        BigDecimal deferredRevenue = scheduleRepo.sumPendingAfter(endOfMonth);
 
         List<RevenueScheduleResponse> schedules = scheduleRepo.findByScheduleDateBetween(startOfMonth, endOfMonth)
                 .stream()

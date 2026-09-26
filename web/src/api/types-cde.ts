@@ -373,9 +373,13 @@ export interface Feedback {
 /** 4 vai trò Admin tạo được tài khoản thay — KHÔNG bao gồm ADMIN/MEMBER. */
 export type EmployeeRole = 'TRAINER' | 'SALE' | 'RECEPTIONIST' | 'ACCOUNTANT'
 
-export type Department = 'TRAINING' | 'SALES' | 'FRONT_DESK' | 'ACCOUNTING'
+/** MANAGEMENT chỉ xuất hiện ở nhân sự Admin — không tạo được qua màn quản lý nhân viên. */
+export type Department = 'TRAINING' | 'SALES' | 'FRONT_DESK' | 'ACCOUNTING' | 'MANAGEMENT'
 
 export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'FREELANCE'
+
+/** Chỉ áp dụng cho vai trò TRAINER — quyết định PT có xuất hiện ở màn chọn PT hay không. */
+export type TrainerLevel = 'JUNIOR' | 'SENIOR' | 'MASTER'
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'RESIGNED'
 

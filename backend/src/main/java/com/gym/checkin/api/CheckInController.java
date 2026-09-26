@@ -2,14 +2,15 @@ package com.gym.checkin.api;
 
 import com.gym.checkin.api.dto.CheckInPreviewResponse;
 import com.gym.checkin.api.dto.CheckInResponse;
+import com.gym.checkin.api.dto.CheckInSelfStatusResponse;
 import com.gym.checkin.service.CheckInService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -64,6 +65,14 @@ public class CheckInController {
         return checkInService.guiYeuCauTuCheckIn(userId);
     }
 
+    @Operation(summary = "Hội viên tự hỏi lại trạng thái yêu cầu tự check-in",
+            description = "App gọi lặp lại (poll) API này sau /self-request, để tự hiện thông báo "
+                        + "ngay khi lễ tân xác nhận — không cần hội viên tự bấm làm mới.")
+    @GetMapping("/self-status")
+    public CheckInSelfStatusResponse trangThaiTuCheckIn(@AuthenticationPrincipal Long userId) {
+        return checkInService.trangThaiTuCheckIn(userId);
+    }
+
     @Operation(summary = "Hàng đợi hội viên đang chờ xác nhận",
             description = "Danh sách hội viên đã tự bấm check-in trên app, cũ nhất trước. "
                         + "Tách riêng khỏi luồng tìm kiếm thủ công — hai đường cùng tồn tại song song.")
@@ -73,13 +82,18 @@ public class CheckInController {
         return checkInService.hangDoiChoXacNhan();
     }
 
-    @Operation(summary = "Bỏ qua một yêu cầu tự check-in",
-            description = "Không cho vào và không ghi lượt nào — dùng khi hội viên bỏ đi hoặc bấm nhầm.")
+    @Operation(summary = "Từ chối một yêu cầu tự check-in",
+            description = "Không cho vào — dùng khi hội viên bỏ đi, bấm nhầm, hoặc không đủ điều "
+                        + "kiện. Bắt buộc nhập lý do, VÀ CÓ GHI LẠI một lượt DENIED_MANUAL thật "
+                        + "(khác hành vi cũ là chỉ xóa khỏi hàng đợi mà không để lại dấu vết gì) "
+                        + "để app hội viên biết chắc chắn là bị từ chối, không hiện nhầm đã được "
+                        + "cho vào.")
     @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
-    @DeleteMapping("/pending-requests/{memberId}")
-    public ResponseEntity<Void> boQuaYeuCau(@PathVariable Long memberId) {
-        checkInService.boQuaYeuCauTuCheckIn(memberId);
-        return ResponseEntity.noContent().build();
+    @PostMapping("/pending-requests/{memberId}/reject")
+    public CheckInResponse tuChoiYeuCau(@AuthenticationPrincipal Long userId,
+                                        @PathVariable Long memberId,
+                                        @Valid @RequestBody TuChoiRequest req) {
+        return checkInService.tuChoiYeuCauTuCheckIn(memberId, userId, req.lyDo());
     }
 
     @Operation(summary = "Ai đang ở trong phòng tập")
@@ -114,4 +128,7 @@ public class CheckInController {
             @NotNull(message = "Thiếu mã hội viên") Long memberId,
             /** Lễ tân chủ động bỏ qua cảnh báo nợ tiền và cho vào. */
             Boolean override) {}
+
+    public record TuChoiRequest(
+            @NotBlank(message = "Phải nhập lý do từ chối") String lyDo) {}
 }

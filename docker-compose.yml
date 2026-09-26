@@ -44,7 +44,8 @@ services:
           memory: 256m
 
   minio:
-    image: minio/minio:latest
+    # MinIO gỡ image khỏi Docker Hub (9-12/9/2026) — dùng quay.io, cùng tag/digest.
+    image: quay.io/minio/minio:latest
     container_name: gym-minio
     command: server /data --console-address ":9001"
     environment:

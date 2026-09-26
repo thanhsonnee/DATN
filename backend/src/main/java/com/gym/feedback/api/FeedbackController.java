@@ -56,7 +56,7 @@ public class FeedbackController {
     }
 
     @Operation(summary = "Đánh giá về tôi", description = "Huấn luyện viên xem lại các đánh giá hội viên gửi về mình.")
-    @PreAuthorize("hasAnyRole('TRAINER','ADMIN')")
+    @PreAuthorize("hasRole('TRAINER')")
     @GetMapping("/trainer/me")
     public List<FeedbackResponse> phanHoiVeToi(@AuthenticationPrincipal Long userId) {
         return service.phanHoiVeToi(userId);
