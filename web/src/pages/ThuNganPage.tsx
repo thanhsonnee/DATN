@@ -18,6 +18,7 @@ import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
 import { tien } from '@/lib/format'
 import { ngayGio, tenHinhThucThanhToan, tenTrangThaiHoaDon } from '@/lib/format-cde'
+import { useAuth } from '@/stores/auth'
 import type { PaymentMethod, ExpenseCategory, PayrollRun } from '@/api/types-cde'
 
 type TabType = 'THU_NGAN' | 'DOANH_THU' | 'BANG_LUONG' | 'CHI_PHI'
@@ -27,7 +28,17 @@ const CAC_NAM_CHON = [2025, 2026, 2027]
 
 /** Màn hình Quản lý Tài chính & Thu ngân (Phân đoạn E1 - E5). */
 export function ThuNganPage() {
-  const [tab, setTab] = useState<TabType>('THU_NGAN')
+  const { user } = useAuth()
+
+  // Tab E1/E2 (quầy thu ngân, mở/đóng ca) gọi /billing/cash-shifts/* — backend
+  // chỉ cho RECEPTIONIST/ADMIN (xem BillingController). Tab E3/E4/E5 gọi
+  // /finance/* — backend chỉ cho ACCOUNTANT/ADMIN (xem FinanceController).
+  // Kế toán không mở/đóng ca nên không thấy tab E1-E2; lễ tân không xem sổ kế
+  // toán nên không thấy tab E3-E5 — bấm vào tab không có quyền là dính 403 vô nghĩa.
+  const xemDuocQuayThuNgan = user?.role === 'RECEPTIONIST' || user?.role === 'ADMIN'
+  const xemDuocSoKeToan = user?.role === 'ACCOUNTANT' || user?.role === 'ADMIN'
+
+  const [tab, setTab] = useState<TabType>(xemDuocQuayThuNgan ? 'THU_NGAN' : 'DOANH_THU')
 
   return (
     <div className="space-y-6">
@@ -39,45 +50,51 @@ export function ThuNganPage() {
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
-          <button
-            onClick={() => setTab('THU_NGAN')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tab === 'THU_NGAN' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Quầy thu ngân (E1-E2)
-          </button>
-          <button
-            onClick={() => setTab('DOANH_THU')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tab === 'DOANH_THU' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Doanh thu dồn tích (E3)
-          </button>
-          <button
-            onClick={() => setTab('BANG_LUONG')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tab === 'BANG_LUONG' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Bảng lương (E4)
-          </button>
-          <button
-            onClick={() => setTab('CHI_PHI')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tab === 'CHI_PHI' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Chi phí & P&L (E5)
-          </button>
+          {xemDuocQuayThuNgan && (
+            <button
+              onClick={() => setTab('THU_NGAN')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                tab === 'THU_NGAN' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Quầy thu ngân (E1-E2)
+            </button>
+          )}
+          {xemDuocSoKeToan && (
+            <>
+              <button
+                onClick={() => setTab('DOANH_THU')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  tab === 'DOANH_THU' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Doanh thu dồn tích (E3)
+              </button>
+              <button
+                onClick={() => setTab('BANG_LUONG')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  tab === 'BANG_LUONG' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Bảng lương (E4)
+              </button>
+              <button
+                onClick={() => setTab('CHI_PHI')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  tab === 'CHI_PHI' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Chi phí & P&L (E5)
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {tab === 'THU_NGAN' && <TabThuNgan />}
-      {tab === 'DOANH_THU' && <TabDoanhThuDonTich />}
-      {tab === 'BANG_LUONG' && <TabBangLuong />}
-      {tab === 'CHI_PHI' && <TabChiPhiVaLoiNhuan />}
+      {xemDuocQuayThuNgan && tab === 'THU_NGAN' && <TabThuNgan />}
+      {xemDuocSoKeToan && tab === 'DOANH_THU' && <TabDoanhThuDonTich />}
+      {xemDuocSoKeToan && tab === 'BANG_LUONG' && <TabBangLuong />}
+      {xemDuocSoKeToan && tab === 'CHI_PHI' && <TabChiPhiVaLoiNhuan />}
     </div>
   )
 }
@@ -440,7 +457,7 @@ function TabDoanhThuDonTich() {
       </div>
 
       {/* Thẻ chỉ số tổng quan E3 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardBody>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -462,18 +479,6 @@ function TabDoanhThuDonTich() {
               {tien(report?.totalAccrualRecognized ?? 0)}
             </p>
             <p className="mt-1 text-xs text-slate-400">Doanh thu phân bổ được ghi nhận trong kỳ</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Doanh thu nhận trước (Deferred)
-            </p>
-            <p className="mt-2 text-2xl font-bold text-amber-700">
-              {tien(report?.totalDeferredRevenue ?? 0)}
-            </p>
-            <p className="mt-1 text-xs text-slate-400">Chờ phân bổ vào các tháng tiếp theo</p>
           </CardBody>
         </Card>
       </div>
@@ -535,6 +540,12 @@ function TabDoanhThuDonTich() {
 // =============================================================================
 
 function TabBangLuong() {
+  const { user } = useAuth()
+  // Duyệt bảng lương chỉ ADMIN được phép (xem FinanceController#approvePayroll,
+  // @PreAuthorize("hasRole('ADMIN')")) — Kế toán chỉ tính nháp và chi trả sau khi
+  // đã duyệt, không tự duyệt được. Ẩn nút đi để tránh bấm vào dính 403 vô nghĩa.
+  const laAdmin = user?.role === 'ADMIN'
+
   const today = new Date()
   const [calcMonth, setCalcMonth] = useState(today.getMonth() + 1)
   const [calcYear, setCalcYear] = useState(today.getFullYear())
@@ -657,7 +668,7 @@ function TabBangLuong() {
                 subtitle={`Mã: ${activeRun.payrollCode} · Trạng thái: ${activeRun.status}`}
                 action={
                   <div className="flex items-center gap-2">
-                    {activeRun.status === 'DRAFT' && (
+                    {activeRun.status === 'DRAFT' && laAdmin && (
                       <Button
                         loading={approvePayroll.isPending}
                         onClick={() => approvePayroll.mutate(activeRun.id)}

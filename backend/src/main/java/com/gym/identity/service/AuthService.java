@@ -32,28 +32,44 @@ public class AuthService {
     /**
      * Hội viên tự đăng ký trên app.
      *
-     * <p>Chỉ tạo {@link Person} + {@link User}. KHÔNG tạo {@link Member} — hồ sơ
-     * hội viên chỉ sinh ra khi chốt mua gói đầu tiên (phương án A).
+     * <p>Chỉ tạo {@link User}, có thể dùng lại {@link Person} đã có sẵn. KHÔNG tạo
+     * {@link Member} — hồ sơ hội viên chỉ sinh ra khi chốt mua gói đầu tiên (phương án A).
+     *
+     * <p><b>Không chặn đăng ký chỉ vì đã có {@link Person} trùng SĐT</b> — Person có thể đã
+     * được tạo trước đó mà chưa từng có tài khoản đăng nhập (ví dụ: Sale tạo Lead tại quầy,
+     * module F). Chỉ chặn khi đã có {@link User} (tài khoản đăng nhập thật) gắn với SĐT đó.
      */
     @Transactional
     public TokenResponse register(RegisterRequest req) {
 
-        if (personRepo.existsByPhoneAndDeletedAtIsNull(req.phone())) {
+        if (userRepo.existsByUsernameAndDeletedAtIsNull(req.phone())) {
             throw ApiException.conflict("PHONE_TAKEN", "Số điện thoại này đã được đăng ký");
         }
-        if (req.email() != null && !req.email().isBlank()
-                && personRepo.existsByEmailAndDeletedAtIsNull(req.email())) {
-            throw ApiException.conflict("EMAIL_TAKEN", "Email này đã được sử dụng");
-        }
-        if (userRepo.existsByUsernameAndDeletedAtIsNull(req.phone())) {
-            throw ApiException.conflict("USERNAME_TAKEN", "Tài khoản này đã tồn tại");
-        }
 
-        Person person = new Person();
-        person.setFullName(req.fullName().trim());
-        person.setPhone(req.phone());
-        person.setEmail(req.email() == null || req.email().isBlank() ? null : req.email().trim());
-        person = personRepo.save(person);
+        Person person = personRepo.findByPhoneAndDeletedAtIsNull(req.phone()).orElse(null);
+
+        if (person != null) {
+            if (req.email() != null && !req.email().isBlank()) {
+                Person chuEmail = personRepo.findByEmailAndDeletedAtIsNull(req.email()).orElse(null);
+                if (chuEmail != null && !chuEmail.getId().equals(person.getId())) {
+                    throw ApiException.conflict("EMAIL_TAKEN", "Email này đã được sử dụng");
+                }
+                person.setEmail(req.email().trim());
+            }
+            if (person.getFullName() == null || person.getFullName().isBlank()) {
+                person.setFullName(req.fullName().trim());
+            }
+        } else {
+            if (req.email() != null && !req.email().isBlank()
+                    && personRepo.existsByEmailAndDeletedAtIsNull(req.email())) {
+                throw ApiException.conflict("EMAIL_TAKEN", "Email này đã được sử dụng");
+            }
+            person = new Person();
+            person.setFullName(req.fullName().trim());
+            person.setPhone(req.phone());
+            person.setEmail(req.email() == null || req.email().isBlank() ? null : req.email().trim());
+            person = personRepo.save(person);
+        }
 
         User user = new User();
         user.setPerson(person);

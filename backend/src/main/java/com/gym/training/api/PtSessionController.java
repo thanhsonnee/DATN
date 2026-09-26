@@ -1,5 +1,6 @@
 package com.gym.training.api;
 
+import com.gym.identity.api.dto.TrainerResponse;
 import com.gym.training.api.dto.DatLichRequest;
 import com.gym.training.api.dto.PtSessionResponse;
 import com.gym.training.domain.ActorSide;
@@ -11,12 +12,14 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Tag(name = "Buổi tập PT", description = "Đặt lịch, xác nhận hai chiều, hủy buổi")
@@ -89,6 +92,16 @@ public class PtSessionController {
         return service.danhDauVangMat(id, ActorSide.valueOf(req.noShowBy()), req.note());
     }
 
+    @Operation(summary = "Huấn luyện viên rảnh trong khung giờ",
+            description = "Dùng khi hội viên chọn ngày/giờ TRƯỚC khi chọn huấn luyện viên — "
+                        + "chỉ trả về những người KHÔNG có buổi đã chốt (SCHEDULED) trùng giờ.")
+    @GetMapping("/available-trainers")
+    public List<TrainerResponse> huanLuyenVienRanh(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime end) {
+        return service.huanLuyenVienRanhLich(start, end);
+    }
+
     @Operation(summary = "Buổi tập của tôi")
     @GetMapping("/me")
     public List<PtSessionResponse> cuaToi(@AuthenticationPrincipal Long userId) {
@@ -96,7 +109,7 @@ public class PtSessionController {
     }
 
     @Operation(summary = "Lịch dạy của tôi")
-    @PreAuthorize("hasAnyRole('TRAINER','ADMIN')")
+    @PreAuthorize("hasRole('TRAINER')")
     @GetMapping("/trainer/me")
     public List<PtSessionResponse> lichDay(@AuthenticationPrincipal Long userId) {
         return service.lichDayCuaHuanLuyenVien(userId);

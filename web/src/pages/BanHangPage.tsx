@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   useLeads,
   useCreateLead,
-  usePublicCreateLead,
   useUpdateLeadContact,
   useMarkLost,
   useAppUserLeads,
@@ -33,7 +32,6 @@ export function BanHangPage() {
   const { data: appUsers, isLoading: isAppUsersLoading } = useAppUserLeads()
 
   const [openCreate, setOpenCreate] = useState(false)
-  const [openPublicForm, setOpenPublicForm] = useState(false)
   const [selectedLeadForContact, setSelectedLeadForContact] = useState<Lead | null>(null)
   const [selectedLeadForLost, setSelectedLeadForLost] = useState<Lead | null>(null)
 
@@ -49,9 +47,6 @@ export function BanHangPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setOpenPublicForm(true)}>
-            🌐 Form tư vấn Web
-          </Button>
           <Button onClick={() => setOpenCreate(true)}>+ Thêm Lead mới</Button>
         </div>
       </div>
@@ -322,7 +317,6 @@ export function BanHangPage() {
 
       {/* Modals */}
       <HopThoaiTaoLead open={openCreate} onClose={() => setOpenCreate(false)} />
-      <HopThoaiFormWeb open={openPublicForm} onClose={() => setOpenPublicForm(false)} />
 
       {selectedLeadForContact && (
         <HopThoaiChamSocLead
@@ -661,107 +655,6 @@ function HopThoaiDanhDauThatBai({ lead, onClose }: { lead: Lead; onClose: () => 
           </Button>
         </div>
       </form>
-    </Modal>
-  )
-}
-
-function HopThoaiFormWeb({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const publicLead = usePublicCreateLead()
-  const { data: goiTaps } = useMemberships()
-
-  const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [membershipId, setMembershipId] = useState<number | ''>('')
-  const [note, setNote] = useState('')
-  const [thanhCong, setThanhCong] = useState(false)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!fullName || !phone) return
-
-    publicLead.mutate(
-      {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim() || undefined,
-        interestedMembershipId: membershipId ? Number(membershipId) : undefined,
-        note: note.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          setThanhCong(true)
-          setTimeout(() => {
-            setThanhCong(false)
-            onClose()
-          }, 1500)
-        },
-      }
-    )
-  }
-
-  return (
-    <Modal open={open} title="Giả lập: Khách hàng gửi Form tư vấn từ Website" onClose={onClose}>
-      {thanhCong ? (
-        <Alert tone="success">
-          Đã gửi thông tin thành công! Hệ thống đã tự động tạo Lead nguồn <b>WEB_FORM</b> ở trạng thái <b>NEW</b>.
-        </Alert>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Họ và tên của bạn *"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nguyễn Khách Lạ"
-              required
-            />
-            <Input
-              label="Số điện thoại *"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0988111222"
-              required
-            />
-          </div>
-
-          <Input
-            label="Email (tùy chọn)"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="khachla@gmail.com"
-          />
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Gói tập quan tâm</label>
-            <select
-              value={membershipId}
-              onChange={(e) => setMembershipId(e.target.value ? Number(e.target.value) : '')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="">-- Chọn gói muốn nhận tư vấn --</option>
-              {goiTaps?.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({tien(g.price)})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <Input
-            label="Lời nhắn / Nhu cầu"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Tư vấn giúp mình lịch tập buổi tối..."
-          />
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={onClose}>Hủy</Button>
-            <Button type="submit" loading={publicLead.isPending}>Gửi yêu cầu tư vấn</Button>
-          </div>
-        </form>
-      )}
     </Modal>
   )
 }

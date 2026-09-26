@@ -27,12 +27,17 @@ function badgeTheoTrangThai(status: string) {
   return <Badge tone="blue">{tenTrangThaiPhanHoi(status)}</Badge>
 }
 
+// Phản hồi còn đang xử lý luôn hiện đầy đủ. Đã RESOLVED/CLOSED gộp vào
+// "Lịch sử" thu gọn — cùng cách làm với GoiCuaToiPage/BuoiTapPage.
+const TRANG_THAI_DANG_XU_LY = new Set(['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'])
+
 export function PhanHoiPage() {
   const { data: lichSu, isLoading } = useMyFeedback()
   const { data: trainers } = useTrainers()
   const { data: equipment } = useEquipmentList()
   const guiPhanHoi = useSubmitFeedback()
   const suaPhanHoi = useUpdateFeedback()
+  const [moLichSu, setMoLichSu] = useState(false)
 
   const [loai, setLoai] = useState<FeedbackType>('GENERAL')
   const [trainerId, setTrainerId] = useState<number | ''>('')
@@ -74,6 +79,34 @@ export function PhanHoiPage() {
       rating: dangSua.feedbackType === 'TRAINER' && ratingSua > 0 ? ratingSua : undefined,
     }, { onSuccess: () => setDangSua(null) })
   }
+
+  const dangXuLy = lichSu?.filter((f) => TRANG_THAI_DANG_XU_LY.has(f.status)) ?? []
+  const daXong = lichSu?.filter((f) => !TRANG_THAI_DANG_XU_LY.has(f.status)) ?? []
+
+  const theCard = (f: Feedback) => (
+    <Card key={f.id}>
+      <CardBody className="space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium text-slate-900">{tenLoaiPhanHoi(f.feedbackType)}</p>
+            <p className="text-xs text-slate-500">{ngayGio(f.createdAt)}</p>
+          </div>
+          {badgeTheoTrangThai(f.status)}
+        </div>
+        {f.trainerName && <p className="text-sm text-slate-600">HLV: {f.trainerName}{f.rating ? ` · ${f.rating}★` : ''}</p>}
+        {f.equipmentName && <p className="text-sm text-slate-600">Thiết bị: {f.equipmentName}</p>}
+        <p className="text-sm text-slate-700">{f.description}</p>
+        {f.resolutionNote && (
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <span className="font-medium">Phản hồi từ phòng gym: </span>{f.resolutionNote}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={() => moSua(f)}>Sửa</Button>
+        </div>
+      </CardBody>
+    </Card>
+  )
 
   return (
     <div className="space-y-6">
@@ -158,36 +191,28 @@ export function PhanHoiPage() {
       </Card>
 
       <div className="space-y-3">
-        <h2 className="font-semibold text-slate-800">Phản hồi đã gửi</h2>
+        <h2 className="font-semibold text-slate-800">Đang chờ xử lý</h2>
         {isLoading ? <Spinner /> : lichSu?.length === 0 ? (
           <EmptyState title="Chưa gửi phản hồi nào" />
+        ) : dangXuLy.length === 0 ? (
+          <p className="text-sm text-slate-500">Không có phản hồi nào đang chờ xử lý.</p>
         ) : (
-          lichSu?.map((f) => (
-            <Card key={f.id}>
-              <CardBody className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-900">{tenLoaiPhanHoi(f.feedbackType)}</p>
-                    <p className="text-xs text-slate-500">{ngayGio(f.createdAt)}</p>
-                  </div>
-                  {badgeTheoTrangThai(f.status)}
-                </div>
-                {f.trainerName && <p className="text-sm text-slate-600">HLV: {f.trainerName}{f.rating ? ` · ${f.rating}★` : ''}</p>}
-                {f.equipmentName && <p className="text-sm text-slate-600">Thiết bị: {f.equipmentName}</p>}
-                <p className="text-sm text-slate-700">{f.description}</p>
-                {f.resolutionNote && (
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    <span className="font-medium">Phản hồi từ phòng gym: </span>{f.resolutionNote}
-                  </div>
-                )}
-                <div className="flex justify-end">
-                  <Button variant="secondary" onClick={() => moSua(f)}>Sửa</Button>
-                </div>
-              </CardBody>
-            </Card>
-          ))
+          dangXuLy.map(theCard)
         )}
       </div>
+
+      {daXong.length > 0 && (
+        <div className="border-t border-slate-200 pt-4">
+          <button
+            onClick={() => setMoLichSu((v) => !v)}
+            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            {moLichSu ? '▾' : '▸'} Phản hồi đã xử lý xong ({daXong.length})
+          </button>
+
+          {moLichSu && <div className="mt-4 space-y-3">{daXong.map(theCard)}</div>}
+        </div>
+      )}
 
       <Modal open={!!dangSua} title="Sửa phản hồi" onClose={() => setDangSua(null)}>
         <div className="space-y-4">

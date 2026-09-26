@@ -44,7 +44,7 @@ public class DemoAccountSeeder {
             if (userRepo.count() > 0) return;
 
             taoNhanVien("0900000001", "Nguyễn Quản Trị", UserRole.ADMIN,
-                    "EM-001", Department.TRAINING, "Chủ phòng gym", 20_000_000, null);
+                    "EM-001", Department.MANAGEMENT, "Chủ phòng gym", 20_000_000, null);
 
             taoNhanVien("0900000002", "Trần Bình", UserRole.TRAINER,
                     "EM-005", Department.TRAINING, "Huấn luyện viên cá nhân",

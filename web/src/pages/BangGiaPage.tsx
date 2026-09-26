@@ -3,13 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMemberships } from '@/hooks/useMemberships'
 import { useMuaGoi } from '@/hooks/useRegistrations'
 import { useAuth } from '@/stores/auth'
+import { HopThoaiFormTuVan } from '@/components/HopThoaiFormTuVan'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
 import { Spinner } from '@/components/ui/Spinner'
 import { Modal } from '@/components/ui/Modal'
-import { tien, tenLoaiGoi } from '@/lib/format'
+import { tien, tenLoaiGoi, ghiChuNoiGoiTuDong } from '@/lib/format'
 import { ApiError } from '@/api/client'
 import type { Membership } from '@/api/types'
 
@@ -25,6 +26,7 @@ export function BangGiaPage() {
 
   const [dangChon, setDangChon] = useState<Membership | null>(null)
   const [ketQua, setKetQua] = useState<string | null>(null)
+  const [openTuVan, setOpenTuVan] = useState(false)
 
   const batDauMua = (goi: Membership) => {
     if (!user) return navigate('/dang-nhap')
@@ -38,7 +40,10 @@ export function BangGiaPage() {
       {
         onSuccess: (hopDong) => {
           setDangChon(null)
-          setKetQua(`Đã tạo hợp đồng ${hopDong.registrationCode}. Vui lòng thanh toán để kích hoạt gói tập.`)
+          setKetQua(
+            `Đã tạo hợp đồng ${hopDong.registrationCode}. Vui lòng thanh toán để kích hoạt gói tập.` +
+            ghiChuNoiGoiTuDong(hopDong),
+          )
         },
       },
     )
@@ -49,11 +54,19 @@ export function BangGiaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Bảng giá gói tập</h1>
-        <p className="mt-1 text-slate-600">
-          Giá và chương trình khuyến mãi đều công khai — không cần liên hệ để hỏi giá.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Bảng giá gói tập</h1>
+          <p className="mt-1 text-slate-600">
+            Giá và chương trình khuyến mãi đều công khai — không cần liên hệ để hỏi giá.
+          </p>
+        </div>
+
+        {!user && (
+          <Button variant="secondary" onClick={() => setOpenTuVan(true)} className="shrink-0">
+            🌐 Nhận tư vấn miễn phí
+          </Button>
+        )}
       </div>
 
       {renewFromRegistrationId != null && (
@@ -121,6 +134,8 @@ export function BangGiaPage() {
           </div>
         )}
       </Modal>
+
+      <HopThoaiFormTuVan open={openTuVan} onClose={() => setOpenTuVan(false)} />
     </div>
   )
 }

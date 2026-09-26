@@ -56,6 +56,7 @@ app:
     secret-key: ${MINIO_SECRET_KEY:gym_dev_password}
     bucket: ${MINIO_BUCKET:gym-private}
     presigned-url-ttl: PT5M      # 5 phút
+    virtual-style: ${MINIO_VIRTUAL_STYLE:false}
 
 springdoc:
   api-docs:
@@ -63,6 +64,14 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+
+management:
+  health:
+    # spring-boot-starter-data-redis có trong pom.xml nhưng không có code nào dùng
+    # (không RedisTemplate/@Cacheable) — tắt health check để /actuator/health không
+    # báo DOWN vì thiếu Redis không liên quan tới sức khỏe thật của app.
+    redis:
+      enabled: false
 
 logging:
   level:

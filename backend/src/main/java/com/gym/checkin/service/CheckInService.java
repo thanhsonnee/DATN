@@ -4,6 +4,7 @@ import com.gym.billing.domain.InvoiceStatus;
 import com.gym.billing.repository.InvoiceRepository;
 import com.gym.checkin.api.dto.CheckInPreviewResponse;
 import com.gym.checkin.api.dto.CheckInResponse;
+import com.gym.checkin.api.dto.CheckInSelfStatusResponse;
 import com.gym.checkin.domain.*;
 import com.gym.checkin.repository.CheckInRepository;
 import com.gym.common.exception.ApiException;
@@ -61,7 +62,10 @@ public class CheckInService {
     @Transactional
     public CheckInResponse quetVao(Long memberId, Long leTanUserId, boolean boQuaCanhBao) {
 
-        Member m = memberRepo.findById(memberId)
+        // Khóa dòng hội viên ngay từ đầu: hai lượt quét gần như đồng thời cho cùng
+        // một người (2 đầu đọc thẻ, hoặc bấm đúp) đều có thể đọc "chưa có lượt mở"
+        // ở dưới trước khi lượt kia kịp ghi, nếu không khóa cả hai sẽ cùng ALLOWED.
+        Member m = memberRepo.khoaHoiVien(memberId)
                 .filter(x -> x.getDeletedAt() == null)
                 .orElse(null);
 
@@ -74,6 +78,11 @@ public class CheckInService {
         // Xử lý xong qua đường nào (tìm tay hay hàng đợi tự check-in) cũng coi như
         // đã giải quyết yêu cầu — không để hội viên còn kẹt trong hàng đợi màn hình quầy.
         hangDoiTuCheckIn.xoaYeuCau(memberId);
+
+        // Tự dọn lượt quên quét ra của NGÀY TRƯỚC trước khi xét gì khác — nếu không, một
+        // lượt tồn đọng do job đêm lỡ chạy (server tắt đúng lúc 23h) sẽ nằm mở song song
+        // với lượt mới hôm nay, gây chồng lấn "đang trong phòng" và sai lệch số liệu.
+        dongLuotMoTuNgayTruoc(memberId);
 
         CheckIn c = new CheckIn();
         c.setMember(m);
@@ -145,7 +154,7 @@ public class CheckInService {
     /** Xác định hợp đồng đang chạy (và tình trạng nợ tiền) hoặc lý do không có hợp đồng nào dùng được. */
     private TrangThaiHopDong xacDinhTrangThaiHopDong(List<Registration> hopDongs, LocalDate homNay) {
         Registration dangChay = hopDongs.stream()
-                .filter(r -> r.getStatus() == RegistrationStatus.ACTIVE
+                .filter(r -> r.allowsCheckIn()
                           && (r.getEndDate() == null || !r.getEndDate().isBefore(homNay)))
                 .findFirst().orElse(null);
 
@@ -168,8 +177,9 @@ public class CheckInService {
 
     /** Lượt vào chưa quét ra, TÍNH TỪ ĐÚNG NGÀY HÔM NAY — dùng chung giữa {@link #quetVao} và {@link #xemTruoc}. */
     private java.util.Optional<CheckIn> timLuotDangMoCungNgay(Long memberId) {
-        return checkInRepo.findFirstByMemberIdAndCheckedOutAtIsNullOrderByCheckedInAtDesc(memberId)
-                .filter(luotCu -> luotCu.getCheckedInAt().toLocalDate().equals(LocalDate.now()));
+        return checkInRepo.timCacLuotDangMoThucSu(memberId).stream()
+                .filter(luotCu -> luotCu.getCheckedInAt().toLocalDate().equals(LocalDate.now()))
+                .findFirst();
     }
 
     /**
@@ -179,13 +189,19 @@ public class CheckInService {
      * thống thống kê. Quyết định cuối vẫn thuộc về người đứng quầy.
      */
     private void phatHienBatThuong(CheckIn c, Member m) {
-        // Quét lại quá nhanh sau lượt trước
+        // Quét lại quá nhanh SAU KHI ĐÃ QUÉT RA lượt trước — phải tính từ lúc RA
+        // (checkedOutAt), không phải lúc VÀO (checkedInAt), nếu không một người tập lâu
+        // (vài tiếng) rồi chuyền thẻ ra ngay sau khi ra sẽ không bị phát hiện, vì khoảng
+        // cách tính từ lúc vào luôn lớn hơn ngưỡng dù họ vừa ra cửa chưa đầy 1 phút.
         int phutChongQuetLai = settings.getInt("checkin.duplicate-scan-window-minutes", 30);
         checkInRepo.findFirstByMemberIdOrderByCheckedInAtDesc(m.getId()).ifPresent(luotCu -> {
-            long phut = Duration.between(luotCu.getCheckedInAt(), OffsetDateTime.now()).toMinutes();
-            if (phut < phutChongQuetLai && luotCu.getCheckedOutAt() != null) {
+            if (luotCu.getCheckedOutAt() == null) {
+                return; // lượt đang mở đã bị chặn hẳn ở bước "đang trong phòng", không tính ở đây
+            }
+            long phut = Duration.between(luotCu.getCheckedOutAt(), OffsetDateTime.now()).toMinutes();
+            if (phut < phutChongQuetLai) {
                 c.setIncidentType(IncidentType.ANTI_PASSBACK);
-                c.setIncidentNote("Quét lại sau " + phut + " phút");
+                c.setIncidentNote("Quét lại sau " + phut + " phút kể từ lúc quét ra lượt trước");
             }
         });
     }
@@ -233,17 +249,72 @@ public class CheckInService {
     /**
      * Hội viên tự bấm "Tôi đã đến phòng tập" trên app — CHƯA ghi lượt check-in nào,
      * chỉ đưa vào hàng đợi để màn hình quầy hiện tên + ảnh cho lễ tân đối chiếu.
+     *
+     * <p>Nếu hội viên ĐANG THỰC SỰ Ở TRONG PHÒNG (chưa quét ra) thì KHÔNG đưa vào hàng
+     * đợi — báo thẳng cho hội viên biết luôn, không làm phiền lễ tân bằng một yêu cầu
+     * chắc chắn sẽ bị từ chối. Lý do sâu hơn: nếu vẫn đưa vào hàng đợi, lễ tân bấm "bỏ
+     * qua" (hoặc hàng đợi tự hết hạn) sẽ xóa yêu cầu này khỏi hàng đợi mà KHÔNG ghi lượt
+     * check-in nào mới — lúc đó {@link #trangThaiTuCheckIn} không còn gì để phân biệt với
+     * lượt vào THẬT trước đó của chính hội viên này, nên lỡ vẫn còn trong cửa sổ 5 phút thì
+     * lại hiện nhầm "Đã xác nhận — mời vào tập" cho một yêu cầu thực ra chưa từng được xử lý.
      */
     @Transactional(readOnly = true)
     public CheckInPreviewResponse guiYeuCauTuCheckIn(Long actorUserId) {
         Member m = memberCuaUser(actorUserId);
-        hangDoiTuCheckIn.themYeuCau(m.getId());
-        return xemTruoc(m.getId());
+        CheckInPreviewResponse preview = xemTruoc(m.getId());
+        if (!CheckInResult.DENIED_ALREADY_INSIDE.name().equals(preview.result())) {
+            hangDoiTuCheckIn.themYeuCau(m.getId());
+        }
+        return preview;
     }
 
-    /** Lễ tân bỏ qua một yêu cầu tự check-in (hội viên bỏ đi, hoặc bấm nhầm) mà không cho vào. */
-    public void boQuaYeuCauTuCheckIn(Long memberId) {
+    /**
+     * Lễ tân TỪ CHỐI một yêu cầu tự check-in trong hàng đợi (không cho vào), luôn kèm lý do.
+     *
+     * <p>Cố ý GHI LẠI một lượt {@code DENIED_MANUAL} thật thay vì chỉ xóa khỏi hàng đợi trong
+     * bộ nhớ như trước — nếu không ghi gì cả, {@link #trangThaiTuCheckIn} không còn cách nào
+     * phân biệt "bị từ chối" với "chưa từng gửi yêu cầu" hay với một lượt check-in KHÁC, không
+     * liên quan, xảy ra tình cờ trong cùng khung 5 phút — dẫn tới hiện nhầm "Đã xác nhận — mời
+     * vào tập" cho một yêu cầu thực ra vừa bị từ chối.
+     */
+    @Transactional
+    public CheckInResponse tuChoiYeuCauTuCheckIn(Long memberId, Long leTanUserId, String lyDo) {
+        Member m = memberRepo.findById(memberId)
+                .filter(x -> x.getDeletedAt() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy hội viên"));
+
         hangDoiTuCheckIn.xoaYeuCau(memberId);
+
+        CheckIn c = new CheckIn();
+        c.setMember(m);
+        c.setMethod(CheckInMethod.QR_DYNAMIC);
+        userRepo.findById(leTanUserId).ifPresent(c::setVerifiedBy);
+        c.setResult(CheckInResult.DENIED_MANUAL);
+        c.setIncidentNote(lyDo);
+        return ghiNhan(c);
+    }
+
+    /**
+     * Hội viên tự hỏi lại trạng thái yêu cầu tự check-in — app gọi lặp lại (poll) sau khi
+     * gửi yêu cầu, để tự hiện thông báo ngay khi lễ tân xác nhận, không cần bấm làm mới tay.
+     *
+     * <p>Còn trong hàng đợi → PENDING. Ra khỏi hàng đợi mà có lượt check-in vừa ghi trong ít
+     * phút gần đây → lễ tân vừa xử lý xong, trả CONFIRMED kèm đúng kết quả thật (có thể là
+     * từ chối, nếu lúc lễ tân xử lý phát hiện hợp đồng có vấn đề). Không thấy gì cả → NONE.
+     */
+    @Transactional(readOnly = true)
+    public CheckInSelfStatusResponse trangThaiTuCheckIn(Long actorUserId) {
+        Member m = memberCuaUser(actorUserId);
+
+        if (hangDoiTuCheckIn.dangCho(m.getId())) {
+            var preview = xemTruoc(m.getId());
+            return CheckInSelfStatusResponse.pending(preview.thongBao(), preview.choPhepVao());
+        }
+
+        return checkInRepo.findFirstByMemberIdOrderByCheckedInAtDesc(m.getId())
+                .filter(c -> Duration.between(c.getCheckedInAt(), OffsetDateTime.now()).toMinutes() <= 5)
+                .map(c -> CheckInSelfStatusResponse.confirmed(CheckInResponse.from(c)))
+                .orElseGet(CheckInSelfStatusResponse::none);
     }
 
     /** Hàng đợi cho màn hình quầy — tính lại tình trạng mới nhất cho từng người, không dùng dữ liệu cũ lúc gửi yêu cầu. */
@@ -264,8 +335,11 @@ public class CheckInService {
     /** Hội viên quét ra khi về. */
     @Transactional
     public CheckInResponse quetRa(Long memberId) {
-        CheckIn c = checkInRepo
-                .findFirstByMemberIdAndCheckedOutAtIsNullOrderByCheckedInAtDesc(memberId)
+        // Dọn trước các lượt quên quét ra của NGÀY TRƯỚC (nếu có) — để lượt thật sự cần
+        // đóng bằng thao tác này luôn là lượt CỦA HÔM NAY, không lẫn với lượt tồn đọng cũ.
+        dongLuotMoTuNgayTruoc(memberId);
+
+        CheckIn c = checkInRepo.timCacLuotDangMoThucSu(memberId).stream().findFirst()
                 .orElseThrow(() -> ApiException.badRequest("NOT_CHECKED_IN",
                         "Không có lượt vào nào đang mở"));
 
@@ -287,16 +361,38 @@ public class CheckInService {
         List<CheckIn> quenQuet = checkInRepo.timLuotQuenCheckOut(dauNgayHomNay);
 
         LocalTime gioDongCua = settings.getLocalTime("gym.closing-time", LocalTime.of(22, 30));
-        for (CheckIn c : quenQuet) {
-            // Lấy giờ đóng cửa của ĐÚNG NGÀY hội viên vào, không phải hôm nay
-            c.setCheckedOutAt(c.getCheckedInAt().with(gioDongCua));
-            c.setAutoClosed(true);
-        }
+        quenQuet.forEach(c -> dongLuotQuen(c, gioDongCua));
 
         if (!quenQuet.isEmpty()) {
             log.info("Tự đóng {} lượt check-in quên quét ra", quenQuet.size());
         }
         return quenQuet.size();
+    }
+
+    /**
+     * Tự đóng ngay các lượt CỦA NGÀY TRƯỚC còn mở của một hội viên, ngay khi hội viên đó
+     * có tương tác mới (quét vào/ra) — không đợi job đêm.
+     *
+     * <p>Job {@link #tuDongDongLuotQuenQuetRa} chỉ chạy nếu server đang sống đúng lúc cron
+     * kích hoạt; nếu server khởi động lại quanh mốc đó (rất thường gặp khi đang phát
+     * triển, và có thể xảy ra cả khi deploy production), lượt quên quét ra có thể tồn
+     * đọng nhiều ngày. Trong lúc đó, hội viên vẫn quét vào bình thường được (vì lượt tồn
+     * đọng không cùng ngày nên không bị chặn "đang trong phòng"), tạo ra HAI lượt mở song
+     * song cho cùng một người — sai cả "ai đang trong phòng" lẫn số liệu thời lượng tập.
+     * Chốt lại ở đây mỗi lần có tương tác để không phải phụ thuộc hoàn toàn vào cron.
+     */
+    private void dongLuotMoTuNgayTruoc(Long memberId) {
+        LocalDate homNay = LocalDate.now();
+        LocalTime gioDongCua = settings.getLocalTime("gym.closing-time", LocalTime.of(22, 30));
+        checkInRepo.timCacLuotDangMoThucSu(memberId).stream()
+                .filter(c -> c.getCheckedInAt().toLocalDate().isBefore(homNay))
+                .forEach(c -> dongLuotQuen(c, gioDongCua));
+    }
+
+    /** Đóng một lượt quên quét ra bằng giờ đóng cửa của ĐÚNG NGÀY hội viên vào, không phải hôm nay. */
+    private void dongLuotQuen(CheckIn c, LocalTime gioDongCua) {
+        c.setCheckedOutAt(c.getCheckedInAt().with(gioDongCua));
+        c.setAutoClosed(true);
     }
 
     // ---------------------------------------------------------------- truy vấn

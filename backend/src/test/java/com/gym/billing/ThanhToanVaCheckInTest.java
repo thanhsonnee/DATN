@@ -414,6 +414,70 @@ class ThanhToanVaCheckInTest {
     }
 
     @Test
+    @DisplayName("Đang trong phòng mà tự bấm request lại thì KHÔNG hiện cho lễ tân thấy")
+    void dangTrongPhongThiKhongHienChoLeTan() {
+        kichHoatHopDong();
+        quetVao();
+
+        // Hội viên lỡ bấm "Tôi đã đến phòng tập" lần nữa dù đang ở trong rồi — API vẫn trả
+        // lời ngay cho hội viên biết (không phải chờ lễ tân), nhưng không được đẩy vào hàng
+        // đợi màn hình quầy: lễ tân sẽ luôn từ chối nó, đưa vào hàng đợi chỉ gây nhiễu và có
+        // rủi ro lễ tân bấm "bỏ qua" khiến app hội viên hiện nhầm thông báo đã được xác nhận.
+        given().header(auth(tokenHoiVien))
+                .when().post("/check-ins/self-request")
+                .then().statusCode(200)
+                .body("result", equalTo("DENIED_ALREADY_INSIDE"))
+                .body("choPhepVao", equalTo(false));
+
+        given().header(auth(tokenLeTan)).when().get("/check-ins/pending-requests")
+                .then().statusCode(200).body("size()", equalTo(0));
+    }
+
+    @Test
+    @DisplayName("Lễ tân từ chối yêu cầu tự check-in kèm lý do — app hội viên biết ngay là bị từ chối")
+    void tuChoiYeuCauCoLyDo() {
+        kichHoatHopDong();
+
+        given().header(auth(tokenHoiVien)).when().post("/check-ins/self-request")
+                .then().statusCode(200);
+
+        given().header(auth(tokenLeTan)).when().get("/check-ins/pending-requests")
+                .then().statusCode(200).body("size()", equalTo(1));
+
+        given().contentType(ContentType.JSON).header(auth(tokenLeTan))
+                .body(Map.of("lyDo", "Không nhận ra khuôn mặt trong ảnh, cần xuất trình CCCD"))
+                .when().post("/check-ins/pending-requests/" + memberId + "/reject")
+                .then().statusCode(200)
+                .body("result", equalTo("DENIED_MANUAL"))
+                .body("choPhepVao", equalTo(false));
+
+        // Đã bị từ chối rồi thì không còn nằm trong hàng đợi lễ tân nữa
+        given().header(auth(tokenLeTan)).when().get("/check-ins/pending-requests")
+                .then().statusCode(200).body("size()", equalTo(0));
+
+        // App hội viên poll lại phải thấy RÕ RÀNG là bị từ chối kèm lý do — không phải
+        // "Đã xác nhận, mời vào tập" như hành vi cũ (chỉ xóa khỏi hàng đợi, không ghi vết).
+        given().header(auth(tokenHoiVien)).when().get("/check-ins/self-status")
+                .then().statusCode(200)
+                .body("status", equalTo("CONFIRMED"))
+                .body("choPhepVao", equalTo(false))
+                .body("lyDo", equalTo("Không nhận ra khuôn mặt trong ảnh, cần xuất trình CCCD"));
+    }
+
+    @Test
+    @DisplayName("Từ chối yêu cầu tự check-in mà không nhập lý do thì bị chặn")
+    void tuChoiThieuLyDoThiChan() {
+        kichHoatHopDong();
+        given().header(auth(tokenHoiVien)).when().post("/check-ins/self-request")
+                .then().statusCode(200);
+
+        given().contentType(ContentType.JSON).header(auth(tokenLeTan))
+                .body(Map.of("lyDo", ""))
+                .when().post("/check-ins/pending-requests/" + memberId + "/reject")
+                .then().statusCode(400);
+    }
+
+    @Test
     @DisplayName("Quét ra rồi thì lượt vào được đóng lại")
     void quetRaThiDongLuot() {
         kichHoatHopDong();

@@ -31,6 +31,17 @@ public class PendingSelfCheckInStore {
         yeuCau.remove(memberId);
     }
 
+    /** Còn đang chờ lễ tân xử lý không (và chưa quá hạn TTL). */
+    public boolean dangCho(Long memberId) {
+        var luc = yeuCau.get(memberId);
+        if (luc == null) return false;
+        if (luc.isBefore(OffsetDateTime.now().minus(TTL))) {
+            yeuCau.remove(memberId);
+            return false;
+        }
+        return true;
+    }
+
     /** Danh sách memberId đang chờ, cũ nhất trước — đã lọc bỏ yêu cầu quá hạn. */
     public List<Long> danhSachDangCho() {
         var hetHan = OffsetDateTime.now().minus(TTL);

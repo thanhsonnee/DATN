@@ -16,6 +16,10 @@ import {
 } from '@/lib/format-cde'
 import type { Feedback, FeedbackStatus, FeedbackType } from '@/api/types-cde'
 
+// Khi chưa lọc theo trạng thái cụ thể, chỉ RESOLVED/CLOSED mới gộp vào lịch
+// sử thu gọn — các trạng thái còn lại đều còn cần xử lý, luôn hiện đầy đủ.
+const TRANG_THAI_DA_DONG = new Set<FeedbackStatus>(['RESOLVED', 'CLOSED'])
+
 const TIEP_THEO: Record<FeedbackStatus, FeedbackStatus[]> = {
   OPEN: ['IN_PROGRESS', 'CLOSED'],
   IN_PROGRESS: ['WAITING_PARTS', 'RESOLVED', 'CLOSED'],
@@ -38,6 +42,7 @@ export function QuanLyPhanHoiPage() {
   const { data: hangDoi, isLoading } = useFeedbackQueue(locStatus || undefined, locType || undefined)
   const { data: equipment } = useEquipmentList()
   const capNhat = useUpdateFeedbackStatus()
+  const [moDaDong, setMoDaDong] = useState(false)
 
   const [dangXuLy, setDangXuLy] = useState<Feedback | null>(null)
   const [trangThaiMoi, setTrangThaiMoi] = useState<FeedbackStatus>('IN_PROGRESS')
@@ -57,6 +62,50 @@ export function QuanLyPhanHoiPage() {
       repairCost: chiPhi ? Number(chiPhi) : undefined,
     }, { onSuccess: () => setDangXuLy(null) })
   }
+
+  // Chỉ tách khối khi chưa lọc theo trạng thái cụ thể — đã tự chọn lọc rồi
+  // thì hiện đúng kết quả đã lọc, không cần tách thêm.
+  const dangCanXuLy = !locStatus ? (hangDoi?.filter((f) => !TRANG_THAI_DA_DONG.has(f.status)) ?? []) : hangDoi ?? []
+  const daXongHet = !locStatus ? (hangDoi?.filter((f) => TRANG_THAI_DA_DONG.has(f.status)) ?? []) : []
+
+  const theCardPhanHoi = (f: Feedback) => (
+    <div key={f.id}
+         className={`rounded-lg border p-4 ${f.urgent ? 'border-red-300 bg-red-50/50' : 'border-slate-200'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-slate-900">{tenLoaiPhanHoi(f.feedbackType)}</p>
+            {f.urgent && <Badge tone="red">Khẩn — cần xử lý trong 24h</Badge>}
+          </div>
+          <p className="text-xs text-slate-500">
+            {f.memberName} · {ngayGio(f.createdAt)}
+          </p>
+        </div>
+        {badgeTheoTrangThai(f.status)}
+      </div>
+
+      {f.trainerName && <p className="mt-2 text-sm text-slate-600">HLV: {f.trainerName}{f.rating ? ` · ${f.rating}★` : ''}</p>}
+      {f.equipmentName && <p className="mt-2 text-sm text-slate-600">Thiết bị: {f.equipmentName}</p>}
+      <p className="mt-1 text-sm text-slate-700">{f.description}</p>
+      {f.resolutionNote && (
+        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          {f.resolutionNote}
+          {f.repairCost != null && ` — chi phí sửa: ${f.repairCost.toLocaleString('vi-VN')}đ`}
+        </div>
+      )}
+
+      {TIEP_THEO[f.status].length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {TIEP_THEO[f.status].map((tt) => (
+            <Button key={tt} variant={tt === 'CLOSED' ? 'secondary' : 'primary'}
+                    onClick={() => moModal(f, tt)}>
+              {tenTrangThaiPhanHoi(tt)}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -111,48 +160,22 @@ export function QuanLyPhanHoiPage() {
           {isLoading ? <Spinner /> : hangDoi?.length === 0 ? (
             <EmptyState title="Không có phản hồi nào khớp bộ lọc" />
           ) : (
-            <div className="space-y-3">
-              {hangDoi?.map((f) => (
-                <div key={f.id}
-                     className={`rounded-lg border p-4 ${f.urgent ? 'border-red-300 bg-red-50/50' : 'border-slate-200'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-900">{tenLoaiPhanHoi(f.feedbackType)}</p>
-                        {f.urgent && <Badge tone="red">Khẩn — cần xử lý trong 24h</Badge>}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        {f.memberName} · {ngayGio(f.createdAt)}
-                      </p>
-                    </div>
-                    {badgeTheoTrangThai(f.status)}
-                  </div>
-
-                  {f.trainerName && <p className="mt-2 text-sm text-slate-600">HLV: {f.trainerName}{f.rating ? ` · ${f.rating}★` : ''}</p>}
-                  {f.equipmentName && <p className="mt-2 text-sm text-slate-600">Thiết bị: {f.equipmentName}</p>}
-                  <p className="mt-1 text-sm text-slate-700">{f.description}</p>
-                  {f.resolutionNote && (
-                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                      {f.resolutionNote}
-                      {f.repairCost != null && ` — chi phí sửa: ${f.repairCost.toLocaleString('vi-VN')}đ`}
-                    </div>
-                  )}
-
-                  {TIEP_THEO[f.status].length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {TIEP_THEO[f.status].map((tt) => (
-                        <Button key={tt} variant={tt === 'CLOSED' ? 'secondary' : 'primary'}
-                                onClick={() => moModal(f, tt)}>
-                          {tenTrangThaiPhanHoi(tt)}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <div className="space-y-3">{dangCanXuLy.map(theCardPhanHoi)}</div>
           )}
         </CardBody>
+
+        {!locStatus && daXongHet.length > 0 && (
+          <div className="border-t border-slate-100 px-5 py-4">
+            <button
+              onClick={() => setMoDaDong((v) => !v)}
+              className="text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              {moDaDong ? '▾' : '▸'} Đã xử lý xong ({daXongHet.length})
+            </button>
+
+            {moDaDong && <div className="mt-4 space-y-3">{daXongHet.map(theCardPhanHoi)}</div>}
+          </div>
+        )}
       </Card>
 
       <Modal open={!!dangXuLy}

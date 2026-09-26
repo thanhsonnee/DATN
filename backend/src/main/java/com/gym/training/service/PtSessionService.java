@@ -1,6 +1,7 @@
 package com.gym.training.service;
 
 import com.gym.common.exception.ApiException;
+import com.gym.identity.api.dto.TrainerResponse;
 import com.gym.identity.domain.*;
 import com.gym.identity.repository.EmployeeRepository;
 import com.gym.identity.repository.MemberRepository;
@@ -356,6 +357,23 @@ public class PtSessionService {
     @Transactional(readOnly = true)
     public PtSessionResponse chiTiet(Long sessionId) {
         return PtSessionResponse.from(require(sessionId));
+    }
+
+    /**
+     * Huấn luyện viên còn rảnh trong khung giờ [batDau, ketThuc) — dùng khi hội
+     * viên chọn ngày/giờ TRƯỚC rồi mới chọn huấn luyện viên, để không cho chọn
+     * người chắc chắn sẽ bị từ chối vì trùng lịch đã chốt.
+     */
+    @Transactional(readOnly = true)
+    public List<TrainerResponse> huanLuyenVienRanhLich(OffsetDateTime batDau, OffsetDateTime ketThuc) {
+        if (!ketThuc.isAfter(batDau)) {
+            throw ApiException.badRequest("INVALID_TIME", "Giờ kết thúc phải sau giờ bắt đầu");
+        }
+        return employeeRepo.findByDepartmentAndDeletedAtIsNull(Department.TRAINING).stream()
+                .filter(e -> e.getStatus() == EmployeeStatus.ACTIVE && e.getLevel() != null)
+                .filter(e -> !trungLichDaChot(e.getId(), batDau, ketThuc, null))
+                .map(TrainerResponse::from)
+                .toList();
     }
 
     // ---------------------------------------------------------------- riêng tư

@@ -16,12 +16,22 @@ import {
 } from '@/lib/format'
 import type { Registration } from '@/api/types'
 
+// Gói còn liên quan tới việc hôm nay: đang chạy, đang bảo lưu, hoặc đang chờ
+// khách trả tiền. Gói COMPLETED/CANCELLED/REFUNDED chỉ còn giá trị tra cứu,
+// gộp vào mục "Lịch sử" thu gọn cho đỡ dài — nhất là với khách hay mua nối
+// tiếp nhiều gói cùng loại (gói cũ tự động chuyển COMPLETED khi hết hạn).
+const TRANG_THAI_CON_LIEN_QUAN = new Set(['ACTIVE', 'FROZEN', 'PENDING_PAYMENT'])
+
 export function GoiCuaToiPage() {
   const user = useAuth((s) => s.user)
   const { data: hopDongs, isLoading } = useMyRegistrations()
   const [xinBaoLuuCho, setXinBaoLuuCho] = useState<Registration | null>(null)
+  const [moLichSu, setMoLichSu] = useState(false)
 
   if (isLoading) return <Spinner />
+
+  const dangLienQuan = hopDongs?.filter((hd) => TRANG_THAI_CON_LIEN_QUAN.has(hd.status)) ?? []
+  const daKetThuc = hopDongs?.filter((hd) => !TRANG_THAI_CON_LIEN_QUAN.has(hd.status)) ?? []
 
   return (
     <div className="space-y-6">
@@ -38,11 +48,34 @@ export function GoiCuaToiPage() {
         <EmptyState title="Chưa có hợp đồng nào" />
       )}
 
+      {dangLienQuan.length === 0 && daKetThuc.length > 0 && (
+        <EmptyState title="Không có gói nào đang hiệu lực" />
+      )}
+
       <div className="space-y-4">
-        {hopDongs?.map((hd) => (
+        {dangLienQuan.map((hd) => (
           <TheHopDong key={hd.id} hopDong={hd} onXinBaoLuu={() => setXinBaoLuuCho(hd)} />
         ))}
       </div>
+
+      {daKetThuc.length > 0 && (
+        <div className="border-t border-slate-200 pt-4">
+          <button
+            onClick={() => setMoLichSu((v) => !v)}
+            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            {moLichSu ? '▾' : '▸'} Lịch sử gói đã kết thúc ({daKetThuc.length})
+          </button>
+
+          {moLichSu && (
+            <div className="mt-4 space-y-4">
+              {daKetThuc.map((hd) => (
+                <TheHopDong key={hd.id} hopDong={hd} onXinBaoLuu={() => setXinBaoLuuCho(hd)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <HopThoaiBaoLuu hopDong={xinBaoLuuCho} onClose={() => setXinBaoLuuCho(null)} />
     </div>
@@ -114,6 +147,15 @@ function TheHopDong({ hopDong, onXinBaoLuu }: {
         {hopDong.status === 'PENDING_PAYMENT' && (
           <Alert tone="info">
             Vui lòng thanh toán. Lễ tân kích hoạt xong thì gói mới bắt đầu tính ngày.
+          </Alert>
+        )}
+
+        {hopDong.renewFromRegistrationId != null && (
+          <Alert tone="info">
+            Gói này tự động nối tiếp sau hợp đồng <span className="font-mono">{hopDong.renewFromRegistrationCode}</span>
+            {hopDong.renewFromEndDate
+              ? ` — bắt đầu ngay sau khi gói đó kết thúc (${ngay(hopDong.renewFromEndDate)}), không chồng ngày.`
+              : ', sẽ tính ngày bắt đầu sau khi gói đó được kích hoạt.'}
           </Alert>
         )}
 

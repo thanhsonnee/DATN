@@ -29,7 +29,12 @@ public record RegistrationResponse(
         LocalDate endDate,
         OffsetDateTime activatedAt,
         String status,
-        Freeze freeze
+        Freeze freeze,
+        /** Hợp đồng cùng loại gói được nối tiếp (tự động hoặc gia hạn thủ công). {@code null} nếu đây là gói độc lập. */
+        Long renewFromRegistrationId,
+        String renewFromRegistrationCode,
+        /** {@code null} nếu hợp đồng gốc chưa từng kích hoạt (chưa có ngày hết hạn để nối vào). */
+        LocalDate renewFromEndDate
 ) {
     /** Thông tin kỳ bảo lưu. {@code null} khi hợp đồng chưa từng xin bảo lưu. */
     public record Freeze(
@@ -48,6 +53,8 @@ public record RegistrationResponse(
                 r.getFreezeReasonType() == null ? null : r.getFreezeReasonType().name(),
                 r.getFreezeStatus().name());
 
+        Registration renewFrom = r.getRenewFrom();
+
         return new RegistrationResponse(
                 r.getId(), r.getRegistrationCode(),
                 r.getMember().getId(), r.getMember().getMemberCode(),
@@ -57,6 +64,9 @@ public record RegistrationResponse(
                 r.getMembership().getMaxFreezeDays(),
                 r.getListPrice(), r.getDiscountAmount(), r.getDiscountReason(), r.getFinalPrice(),
                 r.getContractDate(), r.getStartDate(), r.getEndDate(), r.getActivatedAt(),
-                r.getStatus().name(), freeze);
+                r.getStatus().name(), freeze,
+                renewFrom == null ? null : renewFrom.getId(),
+                renewFrom == null ? null : renewFrom.getRegistrationCode(),
+                renewFrom == null ? null : renewFrom.getEndDate());
     }
 }

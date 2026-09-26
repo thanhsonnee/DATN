@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  useBoQuaYeuCau, useDangTrongPhong, useHangDoiChoXacNhan, useQuetRa, useQuetVao, useXemTruocCheckIn,
+  useTuChoiYeuCau, useDangTrongPhong, useHangDoiChoXacNhan, useQuetRa, useQuetVao, useXemTruocCheckIn,
 } from '@/hooks/useCheckIn'
 import { useTimKiemHoiVien, useUploadMemberPhoto, useDeleteMemberPhoto } from '@/hooks/useLookup'
 import { ChoThanhToan } from '@/components/ChoThanhToan'
@@ -8,6 +8,8 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
+import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/Spinner'
 import { SearchSelect } from '@/components/ui/SearchSelect'
 import { ApiError } from '@/api/client'
@@ -131,7 +133,16 @@ export function ManHinhQuayPage() {
 function HangDoiTuCheckIn() {
   const { data: hangDoi } = useHangDoiChoXacNhan()
   const quetVao = useQuetVao()
-  const boQua = useBoQuaYeuCau()
+  const tuChoi = useTuChoiYeuCau()
+
+  const [dangTuChoi, setDangTuChoi] = useState<{ memberId: number; memberName: string } | null>(null)
+  const [lyDo, setLyDo] = useState('')
+
+  const moModalTuChoi = (memberId: number, memberName: string) => {
+    tuChoi.reset()
+    setLyDo('')
+    setDangTuChoi({ memberId, memberName })
+  }
 
   if (!hangDoi || hangDoi.length === 0) return null
 
@@ -168,13 +179,49 @@ function HangDoiTuCheckIn() {
                       onClick={() => quetVao.mutate({ memberId: yc.memberId })}>
                 Xác nhận vào tập
               </Button>
-              <Button variant="secondary" onClick={() => boQua.mutate(yc.memberId)}>
-                Bỏ qua
+              <Button variant="secondary" onClick={() => moModalTuChoi(yc.memberId, yc.memberName)}>
+                Từ chối
               </Button>
             </div>
           </div>
         ))}
       </CardBody>
+
+      <Modal open={dangTuChoi != null} title="Từ chối yêu cầu check-in"
+             onClose={() => setDangTuChoi(null)}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Từ chối yêu cầu của <b>{dangTuChoi?.memberName}</b> — hội viên sẽ thấy ngay là
+            không được vào tập, kèm lý do bên dưới.
+          </p>
+
+          <Input
+            label="Lý do từ chối"
+            value={lyDo}
+            onChange={(e) => setLyDo(e.target.value)}
+            placeholder="Không đối chiếu được khuôn mặt, cần xuất trình CCCD"
+            autoFocus
+          />
+
+          {tuChoi.error instanceof ApiError && <Alert tone="error">{tuChoi.error.message}</Alert>}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setDangTuChoi(null)}>Đóng</Button>
+            <Button
+              loading={tuChoi.isPending}
+              disabled={!lyDo.trim()}
+              onClick={() => {
+                if (!dangTuChoi) return
+                tuChoi.mutate({ memberId: dangTuChoi.memberId, lyDo: lyDo.trim() }, {
+                  onSuccess: () => setDangTuChoi(null),
+                })
+              }}
+            >
+              Xác nhận từ chối
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   )
 }

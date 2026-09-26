@@ -1,3 +1,5 @@
+import type { Registration } from '@/api/types'
+
 /** Định dạng tiền Việt: 3780000 → "3.780.000 đ" */
 export function tien(value: number | string): string {
   const n = typeof value === 'string' ? Number(value) : value
@@ -67,6 +69,21 @@ export function tenTrangThaiHopDong(status: string): string {
     REFUNDED: 'Đã hoàn tiền',
   }
   return map[status] ?? status
+}
+
+/**
+ * Ghi chú hiển thị sau khi mua gói, khi hợp đồng vừa tạo được hệ thống TỰ ĐỘNG
+ * nối tiếp vào một gói cùng loại khách đang có (tự động gia hạn, tránh chồng
+ * ngày) — người mua/nhân viên bán hàng cần thấy ngay, không phải tự suy luận
+ * từ ngày hết hạn. Rỗng nếu đây là gói độc lập, không nối vào đâu cả.
+ */
+export function ghiChuNoiGoiTuDong(hopDong: Registration): string {
+  if (hopDong.renewFromRegistrationId == null) return ''
+  return hopDong.renewFromEndDate != null
+    ? ` Đang có gói cùng loại còn hạn (kết thúc ${ngay(hopDong.renewFromEndDate)})` +
+      ` nên gói này sẽ tự động bắt đầu ngay sau khi gói đó kết thúc, không bị chồng ngày hay mất ngày.`
+    : ` Gói này sẽ tự động nối tiếp ngay sau gói cùng loại đã mua trước đó` +
+      ` (hợp đồng ${hopDong.renewFromRegistrationCode}), không bị chồng ngày.`
 }
 
 export function tenTrangThaiBaoLuu(status: string): string {

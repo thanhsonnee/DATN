@@ -6,6 +6,7 @@ import type {
   EmployeeSummary,
   EmployeeRole,
   EmploymentType,
+  TrainerLevel,
 } from '@/api/types-cde'
 
 export function useAdminDashboard() {
@@ -31,6 +32,7 @@ export function useCreateEmployeeAccount() {
       email?: string
       role: EmployeeRole
       position?: string
+      level?: TrainerLevel
       employmentType?: EmploymentType
       baseSalary?: number
       startDate?: string

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   useDatLich, useHoiVienXacNhan, useHuyBuoi, useMyPtSessions,
 } from '@/hooks/usePtSessions'
 import { useMyRegistrations } from '@/hooks/useRegistrations'
-import { useTrainers } from '@/hooks/useLookup'
+import { useAvailableTrainers, useTrainers } from '@/hooks/useLookup'
 import { TheBuoiTap } from '@/components/TheBuoiTap'
 import { SoCaiBuoiTap } from '@/components/SoCaiBuoiTap'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +13,12 @@ import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
+import type { PtSession } from '@/api/types-cde'
+
+// Buổi còn actionable (chờ duyệt/chờ xác nhận) luôn hiện đầy đủ. Buổi đã ngã
+// ngũ (COMPLETED/NO_SHOW/CANCELLED/REJECTED) gộp vào "Lịch sử" thu gọn — cùng
+// cách làm với GoiCuaToiPage, để danh sách không dài vô hạn theo thời gian.
+const TRANG_THAI_CAN_CHU_Y = new Set(['PENDING_TRAINER', 'SCHEDULED'])
 
 /** Buổi tập của hội viên: xem lịch, đặt lịch mới, xác nhận đã tập. */
 export function BuoiTapPage() {
@@ -24,11 +30,32 @@ export function BuoiTapPage() {
   const [moDatLich, setMoDatLich] = useState(false)
   const [huyBuoiId, setHuyBuoiId] = useState<number | null>(null)
   const [lyDoHuy, setLyDoHuy] = useState('')
+  const [moLichSu, setMoLichSu] = useState(false)
 
   // Chỉ hợp đồng còn hiệu lực và có buổi PT mới đặt lịch được
   const hopDongCoPt = hopDongs?.filter(
     (h) => h.status === 'ACTIVE' && h.sessionsTotal != null && h.sessionsTotal > 0,
   ) ?? []
+
+  const dangCanChuY = buoiTaps?.filter((b) => TRANG_THAI_CAN_CHU_Y.has(b.status)) ?? []
+  const daKetThuc = buoiTaps?.filter((b) => !TRANG_THAI_CAN_CHU_Y.has(b.status)) ?? []
+
+  const hanhDongCho = (b: PtSession) => (
+    <>
+      {/* Chỉ xác nhận được SAU KHI huấn luyện viên đã bấm kết thúc */}
+      {b.status === 'SCHEDULED' && b.trainerConfirmedAt && !b.memberConfirmedAt && (
+        <Button loading={xacNhan.isPending} onClick={() => xacNhan.mutate(b.id)}>
+          Xác nhận đã tập
+        </Button>
+      )}
+      {b.status === 'SCHEDULED' && !b.trainerConfirmedAt && (
+        <span className="self-center text-xs text-slate-500">
+          Chờ huấn luyện viên bấm kết thúc buổi tập
+        </span>
+      )}
+      <Button variant="secondary" onClick={() => setHuyBuoiId(b.id)}>Hủy buổi</Button>
+    </>
+  )
 
   if (isLoading) return <Spinner />
 
@@ -54,34 +81,36 @@ export function BuoiTapPage() {
       ))}
 
       <div className="space-y-4">
-        <h2 className="font-semibold text-slate-800">Lịch sử buổi tập</h2>
+        <h2 className="font-semibold text-slate-800">Lịch tập sắp tới</h2>
 
         {buoiTaps?.length === 0 && <EmptyState title="Chưa có buổi tập nào" />}
+        {buoiTaps && buoiTaps.length > 0 && dangCanChuY.length === 0 && (
+          <p className="text-sm text-slate-500">Không có buổi nào sắp tới hoặc đang chờ duyệt.</p>
+        )}
 
-        {buoiTaps?.map((b) => (
-          <TheBuoiTap
-            key={b.id} buoi={b} doiTac={b.trainerName}
-            actions={
-              <>
-                {/* Chỉ xác nhận được SAU KHI huấn luyện viên đã bấm kết thúc */}
-                {b.status === 'SCHEDULED' && b.trainerConfirmedAt && !b.memberConfirmedAt && (
-                  <Button loading={xacNhan.isPending} onClick={() => xacNhan.mutate(b.id)}>
-                    Xác nhận đã tập
-                  </Button>
-                )}
-                {b.status === 'SCHEDULED' && !b.trainerConfirmedAt && (
-                  <span className="self-center text-xs text-slate-500">
-                    Chờ huấn luyện viên bấm kết thúc buổi tập
-                  </span>
-                )}
-                {(b.status === 'PENDING_TRAINER' || b.status === 'SCHEDULED') && (
-                  <Button variant="secondary" onClick={() => setHuyBuoiId(b.id)}>Hủy buổi</Button>
-                )}
-              </>
-            }
-          />
+        {dangCanChuY.map((b) => (
+          <TheBuoiTap key={b.id} buoi={b} doiTac={b.trainerName} actions={hanhDongCho(b)} />
         ))}
       </div>
+
+      {daKetThuc.length > 0 && (
+        <div className="border-t border-slate-200 pt-4">
+          <button
+            onClick={() => setMoLichSu((v) => !v)}
+            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            {moLichSu ? '▾' : '▸'} Lịch sử buổi tập ({daKetThuc.length})
+          </button>
+
+          {moLichSu && (
+            <div className="mt-4 space-y-4">
+              {daKetThuc.map((b) => (
+                <TheBuoiTap key={b.id} buoi={b} doiTac={b.trainerName} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {xacNhan.error instanceof ApiError && (
         <Alert tone="error">{xacNhan.error.message}</Alert>
@@ -127,15 +156,38 @@ function HopThoaiDatLich({ open, onClose, hopDongs }: {
     registrationId: 0, trainerId: 0, ngay: '', gio: '19:00', roomName: 'Khu tạ tự do',
   })
 
-  const gui = () => {
+  // Hội viên có thể chọn huấn luyện viên trước, hoặc ngày/giờ trước — thứ tự
+  // không bắt buộc. Nhưng MỘT KHI đã có ngày/giờ, danh sách huấn luyện viên
+  // chỉ còn hiện người rảnh trong khung giờ đó, để không chọn nhầm người chắc
+  // chắn sẽ bị từ chối vì trùng lịch đã chốt.
+  const { batDauISO, ketThucISO } = useMemo(() => {
+    if (!form.ngay) return { batDauISO: null, ketThucISO: null }
     const batDau = new Date(`${form.ngay}T${form.gio}:00`)
     const ketThuc = new Date(batDau.getTime() + 60 * 60 * 1000)
+    return { batDauISO: batDau.toISOString(), ketThucISO: ketThuc.toISOString() }
+  }, [form.ngay, form.gio])
 
+  const daChonGioTruoc = batDauISO != null
+  const { data: trainerRanh, isLoading: dangLocTrainer } = useAvailableTrainers(batDauISO, ketThucISO)
+  const danhSachTrainer = daChonGioTruoc ? trainerRanh : trainers
+  const dangTaiDanhSach = daChonGioTruoc ? dangLocTrainer : dangTaiTrainers
+
+  // Huấn luyện viên đang chọn hóa ra bận vào khung giờ vừa đổi sang — bỏ chọn
+  // để hội viên không gửi yêu cầu chắc chắn sẽ bị từ chối.
+  useEffect(() => {
+    if (daChonGioTruoc && trainerRanh && form.trainerId
+        && !trainerRanh.some((t) => t.id === form.trainerId)) {
+      setForm((f) => ({ ...f, trainerId: 0 }))
+    }
+  }, [trainerRanh, daChonGioTruoc, form.trainerId])
+
+  const gui = () => {
+    if (!batDauISO || !ketThucISO) return
     datLich.mutate({
       registrationId: form.registrationId || hopDongs[0]?.id,
       trainerId: form.trainerId,
-      scheduledStart: batDau.toISOString(),
-      scheduledEnd: ketThuc.toISOString(),
+      scheduledStart: batDauISO,
+      scheduledEnd: ketThucISO,
       roomName: form.roomName,
     }, { onSuccess: onClose })
   }
@@ -161,13 +213,29 @@ function HopThoaiDatLich({ open, onClose, hopDongs }: {
           </div>
         )}
 
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Ngày tập" type="date" value={form.ngay}
+                 onChange={(e) => setForm({ ...form, ngay: e.target.value })} />
+          <Input label="Giờ bắt đầu" type="time" value={form.gio}
+                 onChange={(e) => setForm({ ...form, gio: e.target.value })} />
+        </div>
+
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Chọn huấn luyện viên</label>
-          {dangTaiTrainers ? (
+          {daChonGioTruoc && !dangTaiDanhSach && (
+            <p className="mb-2 text-xs text-slate-500">
+              Đang hiện huấn luyện viên còn rảnh vào khung giờ bạn đã chọn.
+            </p>
+          )}
+          {dangTaiDanhSach ? (
             <p className="text-sm text-slate-400">Đang tải danh sách…</p>
+          ) : danhSachTrainer?.length === 0 ? (
+            <p className="text-sm text-amber-700">
+              Không có huấn luyện viên nào rảnh vào khung giờ này, vui lòng chọn giờ khác.
+            </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
-              {trainers?.map((tr) => (
+              {danhSachTrainer?.map((tr) => (
                 <button
                   key={tr.id} type="button"
                   onClick={() => setForm({ ...form, trainerId: tr.id })}
@@ -187,13 +255,6 @@ function HopThoaiDatLich({ open, onClose, hopDongs }: {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Ngày tập" type="date" value={form.ngay}
-                 onChange={(e) => setForm({ ...form, ngay: e.target.value })} />
-          <Input label="Giờ bắt đầu" type="time" value={form.gio}
-                 onChange={(e) => setForm({ ...form, gio: e.target.value })} />
         </div>
 
         <Input label="Phòng tập" value={form.roomName}

@@ -1,26 +1,32 @@
 package com.gym.common.util;
 
+import com.gym.common.config.AppProperties;
 import com.gym.common.exception.ApiException;
+import io.minio.GetObjectArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
+import io.minio.errors.ErrorResponseException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.*;
+import java.io.InputStream;
 import java.util.Set;
 
 /**
- * Quản lý lưu trữ và phục vụ file cục bộ (ảnh chân dung hội viên, v.v.).
+ * Quản lý lưu trữ và phục vụ ảnh chân dung hội viên qua MinIO (S3-compatible).
+ * Bucket là private — backend luôn đọc/ghi bằng access key riêng, không có URL công khai.
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FileStorageService {
 
-    private static final String UPLOAD_DIR = "uploads/photos";
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg",
@@ -28,20 +34,11 @@ public class FileStorageService {
             "image/webp"
     );
 
-    private final Path rootLocation;
-
-    public FileStorageService() {
-        this.rootLocation = Paths.get(UPLOAD_DIR).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(this.rootLocation);
-        } catch (IOException e) {
-            log.error("Không thể tạo thư mục lưu trữ file: {}", this.rootLocation, e);
-            throw new RuntimeException("Không thể khởi tạo thư mục lưu trữ ảnh", e);
-        }
-    }
+    private final MinioClient minioClient;
+    private final AppProperties appProperties;
 
     /**
-     * Lưu ảnh chân dung của Person và trả về photoKey.
+     * Lưu ảnh chân dung của Person và trả về photoKey (= tên object trong bucket).
      */
     public String storePhoto(Long personId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -64,56 +61,58 @@ public class FileStorageService {
             ext = "webp";
         }
 
-        String filename = String.format("person_%d_%d.%s", personId, System.currentTimeMillis(), ext);
-        Path destination = this.rootLocation.resolve(filename).normalize();
+        String objectKey = String.format("person_%d_%d.%s", personId, System.currentTimeMillis(), ext);
 
-        try {
-            Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-            log.info("Lưu thành công ảnh chân dung: {}", filename);
-            return filename;
-        } catch (IOException e) {
-            log.error("Lỗi khi lưu file ảnh: {}", destination, e);
+        try (InputStream inputStream = file.getInputStream()) {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(appProperties.storage().bucket())
+                    .object(objectKey)
+                    .stream(inputStream, file.getSize(), -1L)
+                    .contentType(contentType)
+                    .build());
+            log.info("Lưu thành công ảnh chân dung lên MinIO: {}", objectKey);
+            return objectKey;
+        } catch (Exception e) {
+            log.error("Lỗi khi tải ảnh lên MinIO: {}", objectKey, e);
             throw ApiException.badRequest("STORAGE_ERROR", "Không thể lưu file ảnh, vui lòng thử lại");
         }
     }
 
     /**
-     * Xóa file ảnh cũ khỏi đĩa. Không ném lỗi nếu file không còn tồn tại —
+     * Xóa object ảnh cũ khỏi bucket. Không ném lỗi nếu không xóa được —
      * mục tiêu là dọn rác, không phải điều kiện bắt buộc phải thành công.
      */
     public void deletePhoto(String photoKey) {
         if (photoKey == null || photoKey.isBlank()) return;
         try {
-            Path filePath = this.rootLocation.resolve(photoKey).normalize();
-            if (!filePath.startsWith(this.rootLocation)) {
-                log.warn("Bỏ qua xóa file có đường dẫn không hợp lệ: {}", photoKey);
-                return;
-            }
-            Files.deleteIfExists(filePath);
-        } catch (IOException e) {
-            log.warn("Không thể xóa file ảnh cũ {}: {}", photoKey, e.getMessage());
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(appProperties.storage().bucket())
+                    .object(photoKey)
+                    .build());
+        } catch (Exception e) {
+            log.warn("Không thể xóa ảnh cũ {} trên MinIO: {}", photoKey, e.getMessage());
         }
     }
 
     /**
-     * Đọc file ảnh dưới dạng Resource để stream về trình duyệt.
+     * Đọc ảnh từ MinIO dưới dạng Resource để stream về trình duyệt qua FileController.
      */
     public Resource loadAsResource(String photoKey) {
         try {
-            // Ngăn chặn Path Traversal
-            Path filePath = this.rootLocation.resolve(photoKey).normalize();
-            if (!filePath.startsWith(this.rootLocation)) {
-                throw ApiException.notFound("Đường dẫn file không hợp lệ");
-            }
-
-            Resource resource = new UrlResource(filePath.toUri());
-            if (resource.exists() && resource.isReadable()) {
-                return resource;
-            } else {
+            InputStream stream = minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(appProperties.storage().bucket())
+                    .object(photoKey)
+                    .build());
+            return new InputStreamResource(stream);
+        } catch (ErrorResponseException e) {
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
                 throw ApiException.notFound("Không tìm thấy ảnh trên hệ thống");
             }
-        } catch (MalformedURLException e) {
-            throw ApiException.notFound("Đường dẫn file không hợp lệ");
+            log.error("Lỗi MinIO khi đọc ảnh {}: {}", photoKey, e.getMessage());
+            throw ApiException.notFound("Không tìm thấy ảnh trên hệ thống");
+        } catch (Exception e) {
+            log.error("Lỗi khi đọc ảnh {} từ MinIO: {}", photoKey, e.getMessage());
+            throw ApiException.notFound("Không tìm thấy ảnh trên hệ thống");
         }
     }
 

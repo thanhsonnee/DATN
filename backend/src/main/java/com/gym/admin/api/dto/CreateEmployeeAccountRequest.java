@@ -1,6 +1,7 @@
 package com.gym.admin.api.dto;
 
 import com.gym.identity.domain.EmploymentType;
+import com.gym.identity.domain.TrainerLevel;
 import com.gym.identity.domain.UserRole;
 import jakarta.validation.constraints.*;
 
@@ -33,6 +34,9 @@ public record CreateEmployeeAccountRequest(
 
         @Size(max = 80)
         String position,
+
+        /** Bắt buộc khi {@code role == TRAINER}, không được gửi cho các vai trò khác. */
+        TrainerLevel level,
 
         EmploymentType employmentType,
 

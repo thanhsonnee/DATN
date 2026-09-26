@@ -2,6 +2,7 @@ import { useAdminDashboard } from '@/hooks/useAdmin'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { tien } from '@/lib/format'
+import { BieuDoSoSanh } from '@/components/BieuDoSoSanh'
 
 /**
  * Dashboard tổng quan cho Admin — 2 nhóm ưu tiên đã chốt: Hội viên & Doanh thu,
@@ -32,6 +33,15 @@ export function AdminDashboardPage() {
                mau={hv.expiringSoonCount > 0 ? 'text-amber-700' : undefined} />
             <O nhan="Đang bảo lưu" giaTri={hv.frozenCount} />
           </div>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <BieuDoSoSanh duLieu={[
+              { nhan: 'Đang hoạt động', giaTri: hv.activeCount, mau: 'thanhcong' },
+              { nhan: 'Mới trong tháng', giaTri: hv.newThisMonthCount },
+              { nhan: 'Sắp hết hạn (7 ngày)', giaTri: hv.expiringSoonCount,
+                mau: hv.expiringSoonCount > 0 ? 'canhbao' : 'default' },
+              { nhan: 'Đang bảo lưu', giaTri: hv.frozenCount },
+            ]} />
+          </div>
         </CardBody>
       </Card>
 
@@ -45,6 +55,18 @@ export function AdminDashboardPage() {
             <O nhan={`Công nợ quá hạn (${dt.unpaidOverdueCount} hóa đơn)`}
                giaTri={tien(dt.unpaidOverdueAmount)}
                mau={dt.unpaidOverdueCount > 0 ? 'text-red-700' : undefined} />
+          </div>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <BieuDoSoSanh
+              dinhDangGiaTri={(v) => tien(v)}
+              duLieu={[
+                { nhan: 'Tiền mặt/chuyển khoản đã thu', giaTri: dt.cashCollectedThisMonth, mau: 'thanhcong' },
+                { nhan: 'Doanh thu ghi nhận (dồn tích)', giaTri: dt.accrualRecognizedThisMonth },
+                { nhan: 'Doanh thu chưa ghi nhận', giaTri: dt.deferredRevenueThisMonth, mau: 'default' },
+                { nhan: 'Công nợ quá hạn', giaTri: dt.unpaidOverdueAmount,
+                  mau: dt.unpaidOverdueCount > 0 ? 'nguyhiem' : 'default' },
+              ]}
+            />
           </div>
         </CardBody>
       </Card>
