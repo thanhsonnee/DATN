@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/stores/auth'
+import { useAuth, trangChinhCuaVaiTro } from '@/stores/auth'
 import { ApiError } from '@/api/client'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -22,7 +22,8 @@ export function DangNhapPage() {
     setDangGui(true)
     try {
       await login(username, password)
-      navigate('/goi-cua-toi')
+      const role = useAuth.getState().user?.role
+      navigate(role && role !== 'MEMBER' ? trangChinhCuaVaiTro(role) : '/goi-cua-toi')
     } catch (err) {
       setLoi(err instanceof ApiError ? err.message : 'Không kết nối được máy chủ')
     } finally {

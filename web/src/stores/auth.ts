@@ -110,3 +110,15 @@ window.addEventListener('storage', (e) => {
 const NHAN_VIEN: UserRole[] = ['ADMIN', 'SALE', 'RECEPTIONIST', 'ACCOUNTANT']
 
 export const laNhanVien = (role?: UserRole) => !!role && NHAN_VIEN.includes(role)
+
+/** Trang chính của từng vai trò — dùng sau khi đăng nhập và cho logo/"Fitness Center". */
+export function trangChinhCuaVaiTro(role?: UserRole): string {
+  switch (role) {
+    case 'ADMIN': return '/quan-tri'
+    case 'SALE': return '/ban-hang'
+    case 'TRAINER': return '/lich-day'
+    case 'RECEPTIONIST': return '/quay'
+    case 'ACCOUNTANT': return '/thu-ngan'
+    default: return '/' // chưa đăng nhập hoặc MEMBER
+  }
+}

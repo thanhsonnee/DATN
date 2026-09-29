@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   useLeads,
   useCreateLead,
@@ -20,6 +20,15 @@ import { tien } from '@/lib/format'
 import { ngayGio } from '@/lib/format-cde'
 import type { Lead, LeadSource, LeadStage, LostReason } from '@/api/types-cde'
 
+/** Ngày hôm nay theo giờ local (không dùng toISOString vì nó quy đổi sang UTC,
+ *  sai lệch ngày vào khung 00h-07h giờ VN). Định dạng khớp `nextFollowUp` (YYYY-MM-DD). */
+function ngayHomNayISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
 /** Màn hình Bán hàng & Quản lý Phễu Leads (Phân đoạn F). */
 export function BanHangPage() {
   const [activeTab, setActiveTab] = useState<'FUNNEL' | 'APP_USERS'>('FUNNEL')
@@ -30,6 +39,13 @@ export function BanHangPage() {
     filterStage === 'ALL' ? undefined : filterStage
   )
   const { data: appUsers, isLoading: isAppUsersLoading } = useAppUserLeads()
+
+  const leadsCanLienHeHomNay = useMemo(() => {
+    const homNay = ngayHomNayISO()
+    return (leads ?? []).filter(
+      (l) => l.nextFollowUp && l.nextFollowUp <= homNay && l.stage !== 'WON' && l.stage !== 'LOST'
+    )
+  }, [leads])
 
   const [openCreate, setOpenCreate] = useState(false)
   const [selectedLeadForContact, setSelectedLeadForContact] = useState<Lead | null>(null)
@@ -50,6 +66,12 @@ export function BanHangPage() {
           <Button onClick={() => setOpenCreate(true)}>+ Thêm Lead mới</Button>
         </div>
       </div>
+
+      {/* Việc cần làm hôm nay — quan trọng hơn phễu tổng quan, nên đặt trên cùng, luôn hiện. */}
+      <BangCanLienHeHomNay
+        leads={leadsCanLienHeHomNay}
+        onChamSoc={(l) => setSelectedLeadForContact(l)}
+      />
 
       {/* Funnel Overview Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -332,6 +354,63 @@ export function BanHangPage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Việc cần làm hôm nay của Sale: lead còn mở (chưa WON/LOST) có hẹn gọi lại
+ * đã đến hoặc quá hạn. Luôn hiển thị trực tiếp (không phải bộ lọc ẩn/hiện) vì
+ * đây là ưu tiên hàng đầu của Sale, quan trọng hơn cả tổng quan phễu bên dưới.
+ */
+function BangCanLienHeHomNay({ leads, onChamSoc }: { leads: Lead[]; onChamSoc: (l: Lead) => void }) {
+  const homNay = ngayHomNayISO()
+
+  return (
+    <Card className="border-amber-300 bg-amber-50/60">
+      <CardHeader
+        title="📅 Cần liên hệ hôm nay"
+        subtitle="Lead đang mở có lịch hẹn gọi lại đã đến hoặc quá hạn — ưu tiên xử lý trước"
+        action={<Badge tone={leads.length > 0 ? 'amber' : 'gray'}>{leads.length} khách hàng</Badge>}
+      />
+      <CardBody className="p-0">
+        {leads.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-slate-500">
+            🎉 Không có khách hàng nào cần liên hệ hôm nay
+          </div>
+        ) : (
+          <div className="divide-y divide-amber-100">
+            {leads.map((l) => {
+              const quaHan = !!l.nextFollowUp && l.nextFollowUp < homNay
+              return (
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900">{l.fullName}</span>
+                      <Badge tone={toneChoStage(l.stage)}>{tenStage(l.stage)}</Badge>
+                      <span className={`text-xs font-semibold ${quaHan ? 'text-red-600' : 'text-amber-700'}`}>
+                        {quaHan ? `Quá hạn (hẹn ${l.nextFollowUp})` : 'Hẹn hôm nay'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-500">
+                      <span className="font-mono text-brand-700">{l.phone}</span>
+                      {l.assignedToName && <span> · Phụ trách: {l.assignedToName}</span>}
+                      {l.lastContactNote && <span> · {l.lastContactNote}</span>}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="!py-1 !px-3 !text-xs shrink-0"
+                    onClick={() => onChamSoc(l)}
+                  >
+                    📞 Chăm sóc
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardBody>
+    </Card>
   )
 }
 

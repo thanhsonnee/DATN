@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/stores/auth'
+import { useAuth, trangChinhCuaVaiTro } from '@/stores/auth'
 import { tenVaiTro } from '@/lib/format'
 import type { UserRole } from '@/api/types'
 
@@ -44,7 +44,8 @@ export function Layout() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3">
-          <Link to="/" className="mr-2 flex shrink-0 items-center gap-2 font-semibold text-slate-900">
+          <Link to={trangChinhCuaVaiTro(user?.role)}
+                className="mr-2 flex shrink-0 items-center gap-2 font-semibold text-slate-900">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">G</span>
             <span className="hidden lg:inline">Fitness Center</span>
           </Link>

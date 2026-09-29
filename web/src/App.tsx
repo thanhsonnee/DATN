@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useAuth } from '@/stores/auth'
+import { useAuth, trangChinhCuaVaiTro } from '@/stores/auth'
 import type { UserRole } from '@/api/types'
 import { Layout } from '@/components/Layout'
 import { Spinner } from '@/components/ui/Spinner'
@@ -37,10 +37,16 @@ export default function App() {
   const canDangNhap = (element: JSX.Element) =>
     user ? element : <Navigate to="/dang-nhap" replace />
 
+  /** Nhân viên (không phải MEMBER) không dùng Bảng giá — vào là về trang chính của họ. */
+  const trangChu =
+    user && user.role !== 'MEMBER'
+      ? <Navigate to={trangChinhCuaVaiTro(user.role)} replace />
+      : <BangGiaPage />
+
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<BangGiaPage />} />
+        <Route path="/" element={trangChu} />
 
         <Route path="/dang-nhap" element={user ? <Navigate to="/" replace /> : <DangNhapPage />} />
         <Route path="/dang-ky" element={user ? <Navigate to="/" replace /> : <DangKyPage />} />
