@@ -20,6 +20,9 @@ public record LeadResponse(
         Long assignedToId,
         String assignedToName,
         String assignedToCode,
+        Long createdById,
+        String createdByName,
+        String createdByRole,
         String stage,
         String lostReason,
         OffsetDateTime lastContactAt,
@@ -31,6 +34,7 @@ public record LeadResponse(
         var p = l.getPerson();
         var m = l.getInterestedMembership();
         var emp = l.getAssignedTo();
+        var creator = l.getCreatedBy();
 
         return new LeadResponse(
                 l.getId(),
@@ -46,6 +50,9 @@ public record LeadResponse(
                 emp != null ? emp.getId() : null,
                 emp != null ? emp.getPerson().getFullName() : null,
                 emp != null ? emp.getEmployeeCode() : null,
+                creator != null ? creator.getId() : null,
+                creator != null ? creator.getPerson().getFullName() : null,
+                creator != null ? creator.getPrimaryRole().name() : null,
                 l.getStage().name(),
                 l.getLostReason() != null ? l.getLostReason().name() : null,
                 l.getLastContactAt(),

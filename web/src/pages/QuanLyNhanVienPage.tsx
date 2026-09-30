@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useEmployeeAccounts, useCreateEmployeeAccount } from '@/hooks/useAdmin'
+import { useEmployeeAccounts, useCreateEmployeeAccount, useUpdateEmployeeAccount } from '@/hooks/useAdmin'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -8,8 +8,8 @@ import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
-import { ngay } from '@/lib/format'
-import type { EmployeeAccount, EmployeeRole, EmploymentType, TrainerLevel } from '@/api/types-cde'
+import { ngay, tien } from '@/lib/format'
+import type { EmployeeAccount, EmployeeRole, EmployeeSummary, EmploymentType, TrainerLevel } from '@/api/types-cde'
 
 const TEN_VAI_TRO: Record<EmployeeRole, string> = {
   TRAINER: 'Huấn luyện viên',
@@ -40,6 +40,7 @@ export function QuanLyNhanVienPage() {
   const { data: nhanVien, isLoading } = useEmployeeAccounts()
   const [openCreate, setOpenCreate] = useState(false)
   const [taiKhoanMoiTao, setTaiKhoanMoiTao] = useState<EmployeeAccount | null>(null)
+  const [dangSua, setDangSua] = useState<EmployeeSummary | null>(null)
 
   return (
     <div className="space-y-6">
@@ -70,6 +71,7 @@ export function QuanLyNhanVienPage() {
                     </p>
                     <p className="text-sm text-slate-500">
                       {nv.phone}{nv.email ? ` · ${nv.email}` : ''}{nv.position ? ` · ${nv.position}` : ''}
+                      {' · '}Lương: {tien(nv.baseSalary)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -77,6 +79,9 @@ export function QuanLyNhanVienPage() {
                     <Badge tone={nv.status === 'ACTIVE' ? 'green' : nv.status === 'ON_LEAVE' ? 'amber' : 'gray'}>
                       {TEN_PHONG_BAN[nv.department] ?? nv.department}
                     </Badge>
+                    <Button variant="secondary" className="!py-1 !px-3 !text-xs" onClick={() => setDangSua(nv)}>
+                      Sửa
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -95,7 +100,61 @@ export function QuanLyNhanVienPage() {
       />
 
       <HopThoaiMatKhauTam taiKhoan={taiKhoanMoiTao} onClose={() => setTaiKhoanMoiTao(null)} />
+
+      {dangSua && (
+        <HopThoaiSuaNhanVien nhanVien={dangSua} onClose={() => setDangSua(null)} />
+      )}
     </div>
+  )
+}
+
+function HopThoaiSuaNhanVien({ nhanVien, onClose }: {
+  nhanVien: EmployeeSummary
+  onClose: () => void
+}) {
+  const updateAccount = useUpdateEmployeeAccount()
+  const [fullName, setFullName] = useState(nhanVien.fullName)
+  const [baseSalary, setBaseSalary] = useState(String(nhanVien.baseSalary ?? ''))
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fullName.trim()) return
+
+    updateAccount.mutate(
+      {
+        id: nhanVien.id,
+        fullName: fullName.trim(),
+        baseSalary: baseSalary ? Number(baseSalary) : undefined,
+      },
+      { onSuccess: onClose }
+    )
+  }
+
+  return (
+    <Modal open title={`Sửa nhân viên — ${nhanVien.employeeCode}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {updateAccount.isError && (
+          <Alert tone="error">
+            {updateAccount.error instanceof ApiError
+              ? updateAccount.error.message
+              : 'Không sửa được nhân viên, vui lòng thử lại'}
+          </Alert>
+        )}
+
+        <Input label="Họ và tên *" value={fullName}
+               onChange={(e) => setFullName(e.target.value)} required />
+        <Input label="Lương cứng (VND)" type="number" min={0} value={baseSalary}
+               onChange={(e) => setBaseSalary(e.target.value)} />
+        <p className="text-xs text-slate-500">
+          Không sửa được số điện thoại (là tên đăng nhập) hay vai trò qua màn này.
+        </p>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
+          <Button type="submit" loading={updateAccount.isPending}>Lưu</Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

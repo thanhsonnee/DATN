@@ -2,8 +2,11 @@ import { useState } from 'react'
 import {
   useTuChoiYeuCau, useDangTrongPhong, useHangDoiChoXacNhan, useQuetRa, useQuetVao, useXemTruocCheckIn,
 } from '@/hooks/useCheckIn'
-import { useTimKiemHoiVien, useUploadMemberPhoto, useDeleteMemberPhoto } from '@/hooks/useLookup'
+import {
+  useTimKiemHoiVien, useUploadMemberPhoto, useDeleteMemberPhoto, useMemberProfile, useUpdateMemberProfile,
+} from '@/hooks/useLookup'
 import { ChoThanhToan } from '@/components/ChoThanhToan'
+import { HopThoaiTaoLead } from '@/components/HopThoaiTaoLead'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -15,7 +18,7 @@ import { SearchSelect } from '@/components/ui/SearchSelect'
 import { ApiError } from '@/api/client'
 import { gioPhut, ngayGio, tenSuCo } from '@/lib/format-cde'
 import { ngay } from '@/lib/format'
-import type { CheckInPreview, CheckInResult, MemberSearchResult } from '@/api/types-cde'
+import type { CheckInPreview, CheckInResult, MemberSearchResult, Gender, MemberGoal, MemberSource } from '@/api/types-cde'
 
 /**
  * Màn hình quầy lễ tân.
@@ -36,6 +39,8 @@ export function ManHinhQuayPage() {
   const { data: ketQuaTim, isFetching: dangTim } = useTimKiemHoiVien(tuKhoa)
   const [daChon, setDaChon] = useState<MemberSearchResult | null>(null)
   const [ketQua, setKetQua] = useState<CheckInResult | null>(null)
+  const [dangSuaHoSo, setDangSuaHoSo] = useState(false)
+  const [openTaoLead, setOpenTaoLead] = useState(false)
 
   const { data: xemTruoc, isFetching: dangXemTruoc } = useXemTruocCheckIn(daChon?.memberId ?? null)
 
@@ -48,7 +53,12 @@ export function ManHinhQuayPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Màn hình quầy</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-slate-900">Màn hình quầy</h1>
+        <Button variant="secondary" onClick={() => setOpenTaoLead(true)}>
+          + Khách cần tư vấn thêm
+        </Button>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
         <div className="space-y-4">
@@ -71,11 +81,19 @@ export function ManHinhQuayPage() {
               />
 
               {daChon && (
-                <TrangThaiTruoc
-                  dangTai={dangXemTruoc} xemTruoc={xemTruoc}
-                  dangGui={quetVao.isPending}
-                  onXacNhan={() => xacNhan(false)}
-                />
+                <>
+                  <div className="flex justify-end">
+                    <Button variant="secondary" className="!py-1 !px-3 !text-xs"
+                            onClick={() => setDangSuaHoSo(true)}>
+                      Sửa hồ sơ
+                    </Button>
+                  </div>
+                  <TrangThaiTruoc
+                    dangTai={dangXemTruoc} xemTruoc={xemTruoc}
+                    dangGui={quetVao.isPending}
+                    onXacNhan={() => xacNhan(false)}
+                  />
+                </>
               )}
 
               {quetVao.error instanceof ApiError && (
@@ -89,6 +107,12 @@ export function ManHinhQuayPage() {
           {ketQua && (
             <KetQuaQuet ketQua={ketQua} />
           )}
+
+          {daChon && dangSuaHoSo && (
+            <HopThoaiSuaHoSo memberId={daChon.memberId} onClose={() => setDangSuaHoSo(false)} />
+          )}
+
+          <HopThoaiTaoLead open={openTaoLead} onClose={() => setOpenTaoLead(false)} />
         </div>
 
         <Card>
@@ -383,6 +407,167 @@ function KetQuaQuet({ ketQua }: {
         )}
       </CardBody>
     </Card>
+  )
+}
+
+const TEN_GIOI_TINH: Record<Gender, string> = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' }
+
+const TEN_MUC_TIEU: Record<MemberGoal, string> = {
+  LOSE_FAT: 'Giảm mỡ', GAIN_MUSCLE: 'Tăng cơ', ENDURANCE: 'Sức bền', HEALTH: 'Sức khỏe chung',
+}
+
+const TEN_NGUON: Record<MemberSource, string> = {
+  WALK_IN: 'Khách vãng lai', HOTLINE: 'Hotline', WEB_FORM: 'Form web', REFERRAL: 'Giới thiệu', APP_SELF: 'Tự đăng ký app',
+}
+
+/**
+ * Sửa hồ sơ hội viên tại quầy — KHÔNG sửa được số điện thoại (là tên đăng nhập),
+ * đổi cần đồng bộ riêng, chưa triển khai.
+ */
+function HopThoaiSuaHoSo({ memberId, onClose }: { memberId: number; onClose: () => void }) {
+  const { data: hoSo, isLoading } = useMemberProfile(memberId)
+  const capNhat = useUpdateMemberProfile()
+
+  const [fullName, setFullName] = useState('')
+  const [gender, setGender] = useState<Gender | ''>('')
+  const [birthday, setBirthday] = useState('')
+  const [nationalId, setNationalId] = useState('')
+  const [email, setEmail] = useState('')
+  const [address, setAddress] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
+  const [healthNote, setHealthNote] = useState('')
+  const [goal, setGoal] = useState<MemberGoal | ''>('')
+  const [source, setSource] = useState<MemberSource | ''>('')
+  const [daNap, setDaNap] = useState(false)
+
+  // Nạp dữ liệu vào form đúng 1 lần khi hồ sơ tải xong — tránh ghi đè lại field
+  // người dùng đang gõ dở mỗi khi query refetch.
+  if (hoSo && !daNap) {
+    setFullName(hoSo.fullName)
+    setGender(hoSo.gender ?? '')
+    setBirthday(hoSo.birthday ?? '')
+    setNationalId(hoSo.nationalId ?? '')
+    setEmail(hoSo.email ?? '')
+    setAddress(hoSo.address ?? '')
+    setEmergencyContactName(hoSo.emergencyContactName ?? '')
+    setEmergencyContactPhone(hoSo.emergencyContactPhone ?? '')
+    setHealthNote(hoSo.healthNote ?? '')
+    setGoal(hoSo.goal ?? '')
+    setSource(hoSo.source ?? '')
+    setDaNap(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fullName.trim()) return
+
+    capNhat.mutate(
+      {
+        memberId,
+        fullName: fullName.trim(),
+        gender: gender || undefined,
+        birthday: birthday || undefined,
+        nationalId: nationalId.trim() || undefined,
+        email: email.trim() || undefined,
+        address: address.trim() || undefined,
+        emergencyContactName: emergencyContactName.trim() || undefined,
+        emergencyContactPhone: emergencyContactPhone.trim() || undefined,
+        healthNote: healthNote.trim() || undefined,
+        goal: goal || undefined,
+        source: source || undefined,
+      },
+      { onSuccess: onClose }
+    )
+  }
+
+  return (
+    <Modal open title={`Sửa hồ sơ — ${hoSo?.memberCode ?? ''}`} onClose={onClose}>
+      {isLoading || !hoSo ? (
+        <p className="py-4 text-center text-sm text-slate-400">Đang tải hồ sơ…</p>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {capNhat.isError && (
+            <Alert tone="error">
+              {capNhat.error instanceof ApiError ? capNhat.error.message : 'Không sửa được hồ sơ, vui lòng thử lại'}
+            </Alert>
+          )}
+
+          <Input label="Số điện thoại (không sửa được)" value={hoSo.phone} disabled />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="Họ và tên *" value={fullName}
+                   onChange={(e) => setFullName(e.target.value)} required />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Giới tính</label>
+              <select value={gender} onChange={(e) => setGender(e.target.value as Gender | '')}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">-- Chưa rõ --</option>
+                {(Object.keys(TEN_GIOI_TINH) as Gender[]).map((g) => (
+                  <option key={g} value={g}>{TEN_GIOI_TINH[g]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="Ngày sinh" type="date" value={birthday}
+                   onChange={(e) => setBirthday(e.target.value)} />
+            <Input label="CCCD/CMND" value={nationalId}
+                   onChange={(e) => setNationalId(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="Email" type="email" value={email}
+                   onChange={(e) => setEmail(e.target.value)} />
+            <Input label="Địa chỉ" value={address}
+                   onChange={(e) => setAddress(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="Người liên hệ khẩn cấp" value={emergencyContactName}
+                   onChange={(e) => setEmergencyContactName(e.target.value)} />
+            <Input label="SĐT liên hệ khẩn cấp" value={emergencyContactPhone}
+                   onChange={(e) => setEmergencyContactPhone(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Mục tiêu tập luyện</label>
+              <select value={goal} onChange={(e) => setGoal(e.target.value as MemberGoal | '')}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">-- Chưa rõ --</option>
+                {(Object.keys(TEN_MUC_TIEU) as MemberGoal[]).map((g) => (
+                  <option key={g} value={g}>{TEN_MUC_TIEU[g]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Nguồn hội viên</label>
+              <select value={source} onChange={(e) => setSource(e.target.value as MemberSource | '')}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">-- Chưa rõ --</option>
+                {(Object.keys(TEN_NGUON) as MemberSource[]).map((s) => (
+                  <option key={s} value={s}>{TEN_NGUON[s]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Bệnh nền / chấn thương</label>
+            <textarea value={healthNote} onChange={(e) => setHealthNote(e.target.value)}
+                      rows={2} placeholder="PT dùng để loại bài tập chống chỉ định"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
+            <Button type="submit" loading={capNhat.isPending}>Lưu</Button>
+          </div>
+        </form>
+      )}
+    </Modal>
   )
 }
 

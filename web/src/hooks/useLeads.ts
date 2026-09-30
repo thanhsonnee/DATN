@@ -99,6 +99,38 @@ export function useMarkLost() {
   })
 }
 
+/** Sửa tên/SĐT/email/nguồn của Lead khi nhập sai lúc tạo — khác /contact (chỉ ghi tương tác). */
+export function useUpdateLead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      leadId,
+      ...body
+    }: {
+      leadId: number
+      fullName?: string
+      phone?: string
+      email?: string
+      source?: LeadSource
+      interestedMembershipId?: number
+    }) => api.put<Lead>(`/leads/${leadId}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] })
+    },
+  })
+}
+
+export function useDeleteLead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (leadId: number) => api.delete(`/leads/${leadId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] })
+      qc.invalidateQueries({ queryKey: ['funnel-stats'] })
+    },
+  })
+}
+
 export function useAssignLead() {
   const qc = useQueryClient()
   return useMutation({

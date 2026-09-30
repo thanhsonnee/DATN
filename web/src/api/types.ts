@@ -45,6 +45,42 @@ export interface Membership {
   description: string | null
 }
 
+export type MembershipSellStatus = 'ACTIVE' | 'ARCHIVED'
+
+/** Gói tập nhìn từ phía Admin — thêm status/displayOrder/ptValueRatio so với bản công khai. */
+export interface MembershipAdmin {
+  id: number
+  code: string
+  name: string
+  packageType: PackageType
+  durationDays: number | null
+  sessionCount: number | null
+  price: number
+  includesTrainer: boolean
+  ptValueRatio: number | null
+  maxFreezeDays: number
+  isRefundable: boolean
+  description: string | null
+  displayOrder: number
+  status: MembershipSellStatus
+}
+
+/** Body gửi lên khi tạo/sửa gói tập — khớp CreateMembershipRequest/UpdateMembershipRequest ở backend. */
+export interface MembershipUpsertInput {
+  code: string
+  name: string
+  packageType: PackageType
+  durationDays: number | null
+  sessionCount: number | null
+  price: number
+  includesTrainer: boolean
+  ptValueRatio: number | null
+  maxFreezeDays: number
+  isRefundable: boolean
+  description: string | null
+  displayOrder: number
+}
+
 export type RegistrationStatus =
   | 'PENDING_PAYMENT' | 'ACTIVE' | 'FROZEN' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED'
 

@@ -3,6 +3,7 @@ package com.gym.feedback.service;
 import com.gym.common.exception.ApiException;
 import com.gym.feedback.api.dto.CreateEquipmentRequest;
 import com.gym.feedback.api.dto.EquipmentResponse;
+import com.gym.feedback.api.dto.UpdateEquipmentRequest;
 import com.gym.feedback.domain.Equipment;
 import com.gym.feedback.repository.EquipmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /** CRUD thiết bị — tầng đơn giản, không có nghiệp vụ. Trạng thái NEEDS_REPAIR do FeedbackService gán. */
@@ -42,5 +44,26 @@ public class EquipmentService {
         return equipmentRepo.findById(id)
                 .filter(e -> e.getDeletedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy thiết bị"));
+    }
+
+    @Transactional
+    public EquipmentResponse suaThietBi(Long id, UpdateEquipmentRequest req) {
+        Equipment e = require(id);
+        e.setName(req.name().trim());
+        e.setRoomName(req.roomName() != null ? req.roomName().trim() : null);
+        e.setStatus(req.status());
+        e.setNote(req.note() != null ? req.note().trim() : null);
+
+        e = equipmentRepo.save(e);
+        log.info("Cập nhật thiết bị #{}: {} ({})", e.getId(), e.getName(), e.getStatus());
+        return EquipmentResponse.from(e);
+    }
+
+    @Transactional
+    public void xoaThietBi(Long id) {
+        Equipment e = require(id);
+        e.setDeletedAt(OffsetDateTime.now());
+        equipmentRepo.save(e);
+        log.info("Đã xóa thiết bị #{}: {}", e.getId(), e.getName());
     }
 }

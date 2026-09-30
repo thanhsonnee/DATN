@@ -166,6 +166,51 @@ class LeadApiTest {
                 .body("stage", equalTo("WON"));
     }
 
+    @Test
+    @DisplayName("F3: Lead từ web form chưa có Sale phụ trách -> Sale nào LƯU nhật ký chăm sóc trước thì được tự động gán")
+    void f3_saleTuGanKhiChamSocTruoc() {
+        // Khách tự điền form công khai — chưa đăng nhập nên chưa ai phụ trách
+        int leadId = given().contentType(ContentType.JSON)
+                .body(Map.of(
+                        "fullName", "Le Chua Ai Nhan",
+                        "phone", "0977888999",
+                        "note", "Muốn tư vấn gói PT"
+                ))
+                .when().post("/leads/public")
+                .then().statusCode(201)
+                .body("assignedToId", nullValue())
+                .extract().path("id");
+
+        // Sale thứ 2 tạo thêm, để kiểm tra đúng người BẤM TRƯỚC được gán, không phải Sale đầu tiên trong hệ thống
+        dangKy("Le Thi Sale Hai", "0900000009");
+        doiVaiTro("0900000009", "SALE");
+        Long saleHaiId = taoNhanVien("0900000009", "EM-020", "SALES", 7_000_000);
+        String tokenSaleHai = dangNhap("0900000009");
+
+        // Sale 2 lưu nhật ký chăm sóc trước -> tự động được gán
+        given().header(auth(tokenSaleHai))
+                .contentType(ContentType.JSON)
+                .body(Map.of(
+                        "stage", "CONTACTED",
+                        "contactNote", "Đã gọi tư vấn, khách quan tâm gói PT"
+                ))
+                .when().put("/leads/" + leadId + "/contact")
+                .then().statusCode(200)
+                .body("assignedToId", equalTo(saleHaiId.intValue()))
+                .body("assignedToName", equalTo("Le Thi Sale Hai"));
+
+        // Sale 1 lưu nhật ký sau -> KHÔNG bị cướp lead, vẫn giữ nguyên Sale 2
+        given().header(auth(tokenSale))
+                .contentType(ContentType.JSON)
+                .body(Map.of(
+                        "stage", "TRIAL_BOOKED",
+                        "contactNote", "Tôi cũng gọi thử, nhưng lead đã có người nhận rồi"
+                ))
+                .when().put("/leads/" + leadId + "/contact")
+                .then().statusCode(200)
+                .body("assignedToId", equalTo(saleHaiId.intValue()));
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================

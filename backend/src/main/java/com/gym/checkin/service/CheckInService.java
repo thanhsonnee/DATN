@@ -257,10 +257,16 @@ public class CheckInService {
      * check-in nào mới — lúc đó {@link #trangThaiTuCheckIn} không còn gì để phân biệt với
      * lượt vào THẬT trước đó của chính hội viên này, nên lỡ vẫn còn trong cửa sổ 5 phút thì
      * lại hiện nhầm "Đã xác nhận — mời vào tập" cho một yêu cầu thực ra chưa từng được xử lý.
+     *
+     * <p>Khóa dòng hội viên (cùng khóa với {@link #quetVao}) trước khi xem trước: nếu không,
+     * yêu cầu này có thể đọc "chưa có lượt vào" ngay trước khi một lượt quét thẻ thủ công
+     * đồng thời kịp ghi xong, khiến yêu cầu bị thêm vào hàng đợi dù hội viên đã thực sự vào
+     * qua đường quét thẻ — hàng đợi treo mãi một yêu cầu đã xong.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public CheckInPreviewResponse guiYeuCauTuCheckIn(Long actorUserId) {
         Member m = memberCuaUser(actorUserId);
+        memberRepo.khoaHoiVien(m.getId());
         CheckInPreviewResponse preview = xemTruoc(m.getId());
         if (!CheckInResult.DENIED_ALREADY_INSIDE.name().equals(preview.result())) {
             hangDoiTuCheckIn.themYeuCau(m.getId());

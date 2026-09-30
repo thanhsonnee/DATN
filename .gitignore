@@ -18,6 +18,10 @@ dist/
 build/
 .expo/
 
+# Build cài đặt mobile (APK/AAB) — file nhị phân, không thuộc source control
+*.apk
+*.aab
+
 # Python (ai-service)
 __pycache__/
 *.pyc

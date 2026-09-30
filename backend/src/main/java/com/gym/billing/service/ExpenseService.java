@@ -3,6 +3,7 @@ package com.gym.billing.service;
 import com.gym.billing.api.dto.CreateExpenseRequest;
 import com.gym.billing.api.dto.ExpenseResponse;
 import com.gym.billing.api.dto.ProfitLossReportResponse;
+import com.gym.billing.api.dto.UpdateExpenseRequest;
 import com.gym.billing.domain.Expense;
 import com.gym.billing.domain.ExpenseCategory;
 import com.gym.billing.domain.ExpenseStatus;
@@ -86,6 +87,29 @@ public class ExpenseService {
             list = expenseRepo.findBySpentAtBetweenAndDeletedAtIsNullOrderBySpentAtDesc(startDate, endDate);
         }
         return list.stream().map(ExpenseResponse::from).toList();
+    }
+
+    /**
+     * Sửa khoản chi nhập sai. `updated_at` do trigger trg_expenses_updated_at ở DB
+     * tự cập nhật khi UPDATE, không cần set tay ở đây.
+     */
+    @Transactional
+    public ExpenseResponse updateExpense(Long id, UpdateExpenseRequest req) {
+        Expense e = expenseRepo.findById(id)
+                .filter(x -> x.getDeletedAt() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy khoản chi"));
+
+        e.setCategory(req.category());
+        e.setTitle(req.title().trim());
+        e.setAmount(req.amount().setScale(2, RoundingMode.HALF_UP));
+        e.setSpentAt(req.spentAt());
+        e.setPaymentMethod(req.paymentMethod());
+        e.setReceiptUrl(req.receiptUrl() != null ? req.receiptUrl().trim() : null);
+        e.setNote(req.note() != null ? req.note().trim() : null);
+
+        Expense saved = expenseRepo.save(e);
+        log.info("Cập nhật chi phí {}: {} - {} đ", saved.getExpenseNo(), saved.getTitle(), saved.getAmount());
+        return ExpenseResponse.from(saved);
     }
 
     /**

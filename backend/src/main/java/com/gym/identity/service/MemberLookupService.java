@@ -3,7 +3,9 @@ package com.gym.identity.service;
 import com.gym.common.exception.ApiException;
 import com.gym.common.util.FileStorageService;
 import com.gym.identity.api.dto.MemberPhotoResponse;
+import com.gym.identity.api.dto.MemberProfileResponse;
 import com.gym.identity.api.dto.MemberSearchResult;
+import com.gym.identity.api.dto.UpdateMemberProfileRequest;
 import com.gym.identity.domain.Member;
 import com.gym.identity.domain.Person;
 import com.gym.identity.repository.MemberRepository;
@@ -75,5 +77,75 @@ public class MemberLookupService {
 
         log.info("Đã xóa ảnh chân dung của hội viên #{}", memberId);
         return new MemberPhotoResponse(m.getId(), m.getMemberCode(), p.getFullName(), null, null);
+    }
+
+    /** Hồ sơ đầy đủ — dùng để nạp sẵn form sửa (Lễ tân/Admin). */
+    @Transactional(readOnly = true)
+    public MemberProfileResponse layThongTin(Long memberId) {
+        Member m = memberRepo.findById(memberId)
+                .filter(x -> x.getDeletedAt() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy hội viên"));
+        return MemberProfileResponse.from(m);
+    }
+
+    /**
+     * Sửa thông tin cá nhân hội viên — KHÔNG sửa SĐT (xem ghi chú ở
+     * {@link UpdateMemberProfileRequest}). Field nào null trong request thì
+     * giữ nguyên giá trị cũ (partial update).
+     */
+    @Transactional
+    public MemberProfileResponse capNhatThongTin(Long memberId, UpdateMemberProfileRequest req) {
+        Member m = memberRepo.findById(memberId)
+                .filter(x -> x.getDeletedAt() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy hội viên"));
+
+        Person p = m.getPerson();
+        if (req.fullName() != null && !req.fullName().isBlank()) {
+            p.setFullName(req.fullName().trim());
+        }
+        if (req.gender() != null) {
+            p.setGender(req.gender());
+        }
+        if (req.birthday() != null) {
+            p.setBirthday(req.birthday());
+        }
+        if (req.nationalId() != null) {
+            p.setNationalId(req.nationalId().isBlank() ? null : req.nationalId().trim());
+        }
+        if (req.email() != null) {
+            String email = req.email().isBlank() ? null : req.email().trim();
+            if (email != null) {
+                personRepo.findByEmailAndDeletedAtIsNull(email)
+                        .filter(other -> !other.getId().equals(p.getId()))
+                        .ifPresent(other -> {
+                            throw ApiException.conflict("EMAIL_TAKEN", "Email này đã được sử dụng");
+                        });
+            }
+            p.setEmail(email);
+        }
+        if (req.address() != null) {
+            p.setAddress(req.address().isBlank() ? null : req.address().trim());
+        }
+        if (req.emergencyContactName() != null) {
+            p.setEmergencyContactName(req.emergencyContactName().isBlank() ? null : req.emergencyContactName().trim());
+        }
+        if (req.emergencyContactPhone() != null) {
+            p.setEmergencyContactPhone(req.emergencyContactPhone().isBlank() ? null : req.emergencyContactPhone().trim());
+        }
+        personRepo.save(p);
+
+        if (req.healthNote() != null) {
+            m.setHealthNote(req.healthNote().isBlank() ? null : req.healthNote().trim());
+        }
+        if (req.goal() != null) {
+            m.setGoal(req.goal());
+        }
+        if (req.source() != null) {
+            m.setSource(req.source());
+        }
+        memberRepo.save(m);
+
+        log.info("Đã cập nhật hồ sơ hội viên #{}", memberId);
+        return MemberProfileResponse.from(m);
     }
 }

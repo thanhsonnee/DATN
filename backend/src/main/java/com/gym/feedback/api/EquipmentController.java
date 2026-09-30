@@ -2,6 +2,7 @@ package com.gym.feedback.api;
 
 import com.gym.feedback.api.dto.CreateEquipmentRequest;
 import com.gym.feedback.api.dto.EquipmentResponse;
+import com.gym.feedback.api.dto.UpdateEquipmentRequest;
 import com.gym.feedback.service.EquipmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,11 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -38,5 +35,20 @@ public class EquipmentController {
     @PostMapping
     public ResponseEntity<EquipmentResponse> them(@Valid @RequestBody CreateEquipmentRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.taoThietBi(req));
+    }
+
+    @Operation(summary = "Sửa thiết bị", description = "Sửa tên/khu vực/ghi chú, cho phép đổi trạng thái tay.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}")
+    public EquipmentResponse sua(@PathVariable Long id, @Valid @RequestBody UpdateEquipmentRequest req) {
+        return service.suaThietBi(id, req);
+    }
+
+    @Operation(summary = "Xóa thiết bị", description = "Dùng khi thanh lý hoặc thêm nhầm. Xóa mềm.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> xoa(@PathVariable Long id) {
+        service.xoaThietBi(id);
+        return ResponseEntity.noContent().build();
     }
 }

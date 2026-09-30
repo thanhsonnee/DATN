@@ -3,6 +3,7 @@ package com.gym.admin.service;
 import com.gym.admin.api.dto.CreateEmployeeAccountRequest;
 import com.gym.admin.api.dto.EmployeeAccountResponse;
 import com.gym.admin.api.dto.EmployeeSummaryResponse;
+import com.gym.admin.api.dto.UpdateEmployeeRequest;
 import com.gym.common.exception.ApiException;
 import com.gym.common.util.CodeGenerator;
 import com.gym.common.util.TempPasswordGenerator;
@@ -114,6 +115,31 @@ public class AdminEmployeeService {
         return employeeRepo.findByDeletedAtIsNull().stream()
                 .map(EmployeeSummaryResponse::from)
                 .toList();
+    }
+
+    /**
+     * Sửa nhân viên — CHỈ họ tên + lương cơ bản (xem lý do ở {@link UpdateEmployeeRequest}).
+     * Field nào null trong request thì giữ nguyên giá trị cũ (partial update).
+     */
+    @Transactional
+    public EmployeeSummaryResponse capNhatNhanVien(Long employeeId, UpdateEmployeeRequest req) {
+        Employee employee = employeeRepo.findById(employeeId)
+                .filter(e -> e.getDeletedAt() == null)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy nhân viên"));
+
+        if (req.fullName() != null && !req.fullName().isBlank()) {
+            Person person = employee.getPerson();
+            person.setFullName(req.fullName().trim());
+            personRepo.save(person);
+        }
+        if (req.baseSalary() != null) {
+            employee.setBaseSalary(req.baseSalary());
+        }
+        Employee saved = employeeRepo.save(employee);
+
+        log.info("Admin cập nhật nhân viên: employeeId={} employeeCode={}",
+                saved.getId(), saved.getEmployeeCode());
+        return EmployeeSummaryResponse.from(saved);
     }
 
     /** department phải khớp 1-1 với primary_role — ràng buộc đã có ở tầng CSDL (chk_emp_level_dept). */

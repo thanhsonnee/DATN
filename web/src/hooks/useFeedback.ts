@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
-import type { Equipment, Feedback, FeedbackStatus, FeedbackType } from '@/api/types-cde'
+import type { Equipment, EquipmentStatus, Feedback, FeedbackStatus, FeedbackType } from '@/api/types-cde'
 
 export function useEquipmentList() {
   return useQuery({
@@ -20,6 +20,30 @@ export function useCreateEquipment() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateEquipmentInput) => api.post<Equipment>('/equipment', input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['equipment'] }),
+  })
+}
+
+export interface UpdateEquipmentInput {
+  id: number
+  name: string
+  roomName?: string
+  status: EquipmentStatus
+  note?: string
+}
+
+export function useUpdateEquipment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: UpdateEquipmentInput) => api.put<Equipment>(`/equipment/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['equipment'] }),
+  })
+}
+
+export function useDeleteEquipment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/equipment/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['equipment'] }),
   })
 }

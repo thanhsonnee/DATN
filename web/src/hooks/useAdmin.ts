@@ -42,3 +42,21 @@ export function useCreateEmployeeAccount() {
     },
   })
 }
+
+export interface UpdateEmployeeInput {
+  id: number
+  fullName?: string
+  baseSalary?: number
+}
+
+/** Chỉ sửa được họ tên + lương cơ bản — không có SĐT/vai trò (xem UpdateEmployeeRequest ở backend). */
+export function useUpdateEmployeeAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: UpdateEmployeeInput) =>
+      api.put<EmployeeSummary>(`/admin/employees/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'employees'] })
+    },
+  })
+}

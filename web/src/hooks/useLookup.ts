@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, getAccessToken } from '@/api/client'
-import type { MemberPhotoResponse, MemberSearchResult, Trainer } from '@/api/types-cde'
+import type {
+  EmployeeBrief,
+  MemberPhotoResponse,
+  MemberProfile,
+  MemberSearchResult,
+  Trainer,
+  UpdateMemberProfileInput,
+} from '@/api/types-cde'
 
 /**
  * Tìm hội viên theo tên/số điện thoại/mã hội viên — gõ tới đâu ra tới đó.
@@ -21,6 +28,15 @@ export function useTrainers() {
   return useQuery({
     queryKey: ['trainers'],
     queryFn: () => api.get<Trainer[]>('/employees/trainers'),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Danh sách Sale đang hoạt động — lễ tân chọn người phụ trách khi tạo lead tại quầy. */
+export function useSalesEmployees() {
+  return useQuery({
+    queryKey: ['employees', 'sales'],
+    queryFn: () => api.get<EmployeeBrief[]>('/employees/sales'),
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -64,6 +80,28 @@ export function useUploadMemberPhoto() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['check-ins', 'preview'] })
+      qc.invalidateQueries({ queryKey: ['members', 'search'] })
+    },
+  })
+}
+
+/** Hồ sơ đầy đủ 1 hội viên — dùng để nạp sẵn form sửa tại quầy (Lễ tân/Admin). */
+export function useMemberProfile(memberId: number | null) {
+  return useQuery({
+    queryKey: ['members', 'profile', memberId],
+    queryFn: () => api.get<MemberProfile>(`/members/${memberId}`),
+    enabled: !!memberId,
+  })
+}
+
+/** Sửa thông tin cá nhân hội viên — KHÔNG sửa được SĐT qua đây. */
+export function useUpdateMemberProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ memberId, ...body }: UpdateMemberProfileInput & { memberId: number }) =>
+      api.put<MemberProfile>(`/members/${memberId}`, body),
+    onSuccess: (_, { memberId }) => {
+      qc.invalidateQueries({ queryKey: ['members', 'profile', memberId] })
       qc.invalidateQueries({ queryKey: ['members', 'search'] })
     },
   })

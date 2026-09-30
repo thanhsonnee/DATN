@@ -21,9 +21,19 @@ thẳng từ các file migration đã áp dụng, mô tả **hiện trạng th�
 `docs/*.md` (kế hoạch cũ, nhiều phần chưa triển khai). Đừng suy luận kiến trúc
 chỉ từ `docs/*.md` — luôn đối chiếu với code/migration thật trước khi đưa lời
 khuyên (vd. một dependency có trong `pom.xml`/`docker-compose.yml` không có
-nghĩa là code thực sự dùng nó — xem `spring-boot-starter-data-redis` và cấu
-hình MinIO: cả hai đều được khai báo nhưng hiện không có chỗ nào trong code
-gọi tới; lưu file thật sự đi qua `FileStorageService` ghi đĩa cục bộ).
+nghĩa là code thực sự dùng nó — `spring-boot-starter-data-redis` có khai báo
+nhưng không có code nào dùng thật, `/actuator/health` đã tắt health check
+Redis vì lý do này. Ngược lại, MinIO **có** dùng thật: `FileStorageService`
+lưu/đọc/xóa ảnh chân dung hội viên qua `MinioClient` (giao thức S3), không ghi
+đĩa cục bộ — cấu hình qua `app.storage.*`/biến môi trường `MINIO_*`. Dev local
+dùng container MinIO của `docker-compose.yml` (volume `miniodata`, endpoint
+`localhost:9000`). Trên Railway, service `gym-backend` có khai báo đủ 5 biến
+`MINIO_ENDPOINT`/`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`/`MINIO_BUCKET`/
+`MINIO_VIRTUAL_STYLE` nhưng project Railway không có service MinIO nào —
+nghĩa là endpoint đó trỏ ra một MinIO/S3 khác bên ngoài project. **Ảnh upload
+ở local và ảnh upload trên bản deploy nằm ở hai nơi lưu trữ vật lý khác
+nhau, hoàn toàn tách biệt** — đừng giả định ảnh test ở máy dev sẽ xuất hiện
+trên production hay ngược lại).
 
 ## Commands
 

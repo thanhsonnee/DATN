@@ -57,6 +57,11 @@ public class LeadService {
         Person person = findOrCreatePersonByPhone(phone, req.fullName(), req.email());
 
         Lead lead = findOrCreateLead(person, req.source());
+        User actor = actorUserId != null ? userRepo.findById(actorUserId).orElse(null) : null;
+
+        if (lead.getCreatedBy() == null && actor != null) {
+            lead.setCreatedBy(actor);
+        }
 
         if (req.interestedMembershipId() != null) {
             Membership m = membershipRepo.findById(req.interestedMembershipId())
@@ -69,15 +74,8 @@ public class LeadService {
                     .filter(e -> e.getDeletedAt() == null)
                     .orElseThrow(() -> ApiException.notFound("Không tìm thấy nhân viên"));
             lead.setAssignedTo(emp);
-        } else if (actorUserId != null && lead.getAssignedTo() == null) {
-            // Tự động gán cho Sale đang đăng nhập nếu người đó thuộc phòng Sales
-            User u = userRepo.findById(actorUserId).orElse(null);
-            if (u != null && u.getPerson() != null) {
-                Employee emp = employeeRepo.findByPersonIdAndDeletedAtIsNull(u.getPerson().getId()).orElse(null);
-                if (emp != null && emp.getDepartment() == Department.SALES) {
-                    lead.setAssignedTo(emp);
-                }
-            }
+        } else {
+            tuGanChoSaleNeuChuaCoAi(lead, actor);
         }
 
         if (req.note() != null && !req.note().isBlank()) {
@@ -133,14 +131,21 @@ public class LeadService {
 
     /**
      * Ghi nhận tương tác chăm sóc (gọi điện, hẹn tập thử, cập nhật phễu).
+     *
+     * <p>Lead chưa có Sale phụ trách (vd. từ form công khai) thì Sale nào LƯU nhật ký
+     * chăm sóc TRƯỚC sẽ tự động được gán — không cần màn hình "Nhận lead" riêng, tránh
+     * việc nhiều Sale cùng gọi trùng một khách.
      */
     @Transactional
-    public LeadResponse updateContact(Long leadId, UpdateLeadContactRequest req) {
+    public LeadResponse updateContact(Long leadId, UpdateLeadContactRequest req, Long actorUserId) {
         Lead lead = require(leadId);
 
         if (req.stage() == LeadStage.LOST) {
             throw ApiException.badRequest("USE_MARK_LOST", "Vui lòng dùng chức năng Đánh dấu thất bại để ghi rõ lý do");
         }
+
+        User actor = actorUserId != null ? userRepo.findById(actorUserId).orElse(null) : null;
+        tuGanChoSaleNeuChuaCoAi(lead, actor);
 
         lead.setStage(req.stage());
         lead.setLastContactAt(OffsetDateTime.now());
@@ -158,6 +163,57 @@ public class LeadService {
         lead = leadRepo.save(lead);
         log.info("Cập nhật Lead #{}: stage={}, nextFollowUp={}", leadId, lead.getStage(), lead.getNextFollowUp());
         return LeadResponse.from(lead);
+    }
+
+    /**
+     * Sửa thông tin chung của Lead (tên/SĐT/email/nguồn) khi nhập sai lúc tạo.
+     * Field nào null trong request thì giữ nguyên giá trị cũ.
+     */
+    @Transactional
+    public LeadResponse updateLead(Long leadId, UpdateLeadRequest req) {
+        Lead lead = require(leadId);
+        Person p = lead.getPerson();
+
+        if (req.fullName() != null && !req.fullName().isBlank()) {
+            p.setFullName(req.fullName().trim());
+        }
+        if (req.phone() != null && !req.phone().isBlank()) {
+            String phone = req.phone().trim();
+            personRepo.findByPhoneAndDeletedAtIsNull(phone)
+                    .filter(other -> !other.getId().equals(p.getId()))
+                    .ifPresent(other -> {
+                        throw ApiException.conflict("PHONE_TAKEN", "Số điện thoại này đã được đăng ký");
+                    });
+            p.setPhone(phone);
+        }
+        if (req.email() != null) {
+            p.setEmail(req.email().isBlank() ? null : req.email().trim());
+        }
+        personRepo.save(p);
+
+        if (req.source() != null) {
+            lead.setSource(req.source());
+        }
+        if (req.interestedMembershipId() != null) {
+            Membership m = membershipRepo.findById(req.interestedMembershipId())
+                    .orElseThrow(() -> ApiException.notFound("Không tìm thấy gói tập quan tâm"));
+            lead.setInterestedMembership(m);
+        }
+        lead = leadRepo.save(lead);
+
+        log.info("Cập nhật thông tin chung Lead #{}", leadId);
+        return LeadResponse.from(lead);
+    }
+
+    /**
+     * Xóa Lead (khách trùng/spam nhập nhầm) — xóa mềm.
+     */
+    @Transactional
+    public void deleteLead(Long leadId) {
+        Lead lead = require(leadId);
+        lead.setDeletedAt(OffsetDateTime.now());
+        leadRepo.save(lead);
+        log.info("Đã xóa Lead #{}", leadId);
     }
 
     /**
@@ -294,6 +350,21 @@ public class LeadService {
         return leadRepo.findById(id)
                 .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy khách hàng tiềm năng"));
+    }
+
+    /**
+     * Lead chưa có ai phụ trách thì tự gán cho actor đang thao tác, NẾU actor đó là Sale
+     * (phòng ban SALES) — dùng chung cho lúc tạo lead lẫn lúc lưu nhật ký chăm sóc, để
+     * "Sale nào chăm sóc trước thì nhận lead đó" mà không cần thêm màn hình "Nhận lead".
+     * Không làm gì nếu lead đã có người phụ trách hoặc actor không phải Sale (vd. Lễ tân,
+     * Admin thao tác hộ) — tránh gán nhầm cho người không phải Sale.
+     */
+    private void tuGanChoSaleNeuChuaCoAi(Lead lead, User actor) {
+        if (lead.getAssignedTo() != null || actor == null || actor.getPerson() == null) return;
+
+        employeeRepo.findByPersonIdAndDeletedAtIsNull(actor.getPerson().getId())
+                .filter(emp -> emp.getDepartment() == Department.SALES)
+                .ifPresent(lead::setAssignedTo);
     }
 
     /** Tìm Person theo SĐT, tạo mới nếu chưa có — chống trùng khách hàng giữa các kênh tiếp nhận. */

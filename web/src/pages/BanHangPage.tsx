@@ -3,11 +3,15 @@ import {
   useLeads,
   useCreateLead,
   useUpdateLeadContact,
+  useUpdateLead,
+  useDeleteLead,
   useMarkLost,
   useAppUserLeads,
   useFunnelStats,
 } from '@/hooks/useLeads'
 import { useMemberships } from '@/hooks/useMemberships'
+import { useAuth } from '@/stores/auth'
+import { HopThoaiTaoLead } from '@/components/HopThoaiTaoLead'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -47,9 +51,14 @@ export function BanHangPage() {
     )
   }, [leads])
 
+  const { user } = useAuth()
+  const canXoaLead = user?.role === 'SALE' || user?.role === 'ADMIN'
+
   const [openCreate, setOpenCreate] = useState(false)
   const [selectedLeadForContact, setSelectedLeadForContact] = useState<Lead | null>(null)
   const [selectedLeadForLost, setSelectedLeadForLost] = useState<Lead | null>(null)
+  const [selectedLeadForEdit, setSelectedLeadForEdit] = useState<Lead | null>(null)
+  const deleteLead = useDeleteLead()
 
   if (isStatsLoading || isLeadsLoading || isAppUsersLoading) return <Spinner />
 
@@ -182,6 +191,11 @@ export function BanHangPage() {
                           <div className="font-semibold text-slate-900">{l.fullName}</div>
                           <div className="font-mono text-xs text-brand-700">{l.phone}</div>
                           {l.email && <div className="text-xs text-slate-400">{l.email}</div>}
+                          {l.createdByName && (
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              Tạo bởi: {l.createdByName}{l.createdByRole === 'RECEPTIONIST' ? ' (Lễ tân)' : ''}
+                            </div>
+                          )}
                         </td>
                         <td className="px-5 py-3">
                           <Badge tone="gray">{tenNguonLead(l.source)}</Badge>
@@ -249,6 +263,24 @@ export function BanHangPage() {
                           {l.stage === 'WON' && (
                             <span className="text-xs font-semibold text-emerald-700">✓ Đã mua gói</span>
                           )}
+                          <button
+                            onClick={() => setSelectedLeadForEdit(l)}
+                            className="text-xs text-slate-600 hover:text-slate-900 font-medium px-1.5 py-1"
+                          >
+                            Sửa
+                          </button>
+                          {canXoaLead && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Xóa lead "${l.fullName}" (${l.phone})? Không thể hoàn tác.`)) {
+                                  deleteLead.mutate(l.id)
+                                }
+                              }}
+                              className="text-xs text-red-600 hover:text-red-800 font-medium px-1.5 py-1"
+                            >
+                              Xóa
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -315,6 +347,9 @@ export function BanHangPage() {
                                 assignedToId: null,
                                 assignedToName: null,
                                 assignedToCode: null,
+                                createdById: null,
+                                createdByName: null,
+                                createdByRole: null,
                                 stage: 'NEW',
                                 lostReason: null,
                                 lastContactAt: null,
@@ -351,6 +386,13 @@ export function BanHangPage() {
         <HopThoaiDanhDauThatBai
           lead={selectedLeadForLost}
           onClose={() => setSelectedLeadForLost(null)}
+        />
+      )}
+
+      {selectedLeadForEdit && (
+        <HopThoaiSuaLead
+          lead={selectedLeadForEdit}
+          onClose={() => setSelectedLeadForEdit(null)}
         />
       )}
     </div>
@@ -444,137 +486,6 @@ function FunnelCard({
 // -----------------------------------------------------------------------------
 // Modals
 // -----------------------------------------------------------------------------
-
-function HopThoaiTaoLead({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const createLead = useCreateLead()
-  const { data: goiTaps } = useMemberships()
-
-  const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [source, setSource] = useState<LeadSource>('WALK_IN')
-  const [membershipId, setMembershipId] = useState<number | ''>('')
-  const [note, setNote] = useState('')
-  const [nextFollowUp, setNextFollowUp] = useState('')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!fullName || !phone) return
-
-    createLead.mutate(
-      {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim() || undefined,
-        source,
-        interestedMembershipId: membershipId ? Number(membershipId) : undefined,
-        note: note.trim() || undefined,
-        nextFollowUp: nextFollowUp || undefined,
-      },
-      {
-        onSuccess: () => {
-          setFullName('')
-          setPhone('')
-          setEmail('')
-          setNote('')
-          setNextFollowUp('')
-          onClose()
-        },
-      }
-    )
-  }
-
-  return (
-    <Modal open={open} title="Tiếp nhận khách hàng tiềm năng mới (Lead)" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="Họ và tên *"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Nguyễn Văn A"
-            required
-          />
-          <Input
-            label="Số điện thoại *"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="0912345678"
-            required
-          />
-        </div>
-
-        <Input
-          label="Email (tùy chọn)"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="khachhang@example.com"
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Nguồn tiếp nhận *</label>
-            <select
-              value={source}
-              onChange={(e) => setSource(e.target.value as LeadSource)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="WALK_IN">Đến quầy trực tiếp (WALK_IN)</option>
-              <option value="HOTLINE">Gọi Hotline hỏi giá (HOTLINE)</option>
-              <option value="WEB_FORM">Để lại số trên Website (WEB_FORM)</option>
-              <option value="REFERRAL">Hội viên cũ giới thiệu (REFERRAL)</option>
-              <option value="APP_SELF">Tự đăng ký App (APP_SELF)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Gói quan tâm</label>
-            <select
-              value={membershipId}
-              onChange={(e) => setMembershipId(e.target.value ? Number(e.target.value) : '')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="">-- Chưa rõ / Tư vấn sau --</option>
-              {goiTaps?.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({tien(g.price)})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <Input
-          label="Hẹn ngày liên hệ lại (Follow-up)"
-          type="date"
-          value={nextFollowUp}
-          onChange={(e) => setNextFollowUp(e.target.value)}
-        />
-
-        <Input
-          label="Ghi chú nhu cầu khách"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Muốn giảm cân, hỏi gói 6 tháng kèm PT..."
-        />
-
-        {createLead.error instanceof ApiError && (
-          <Alert tone="error">
-            {createLead.error.fields
-              ? Object.values(createLead.error.fields).join(', ')
-              : createLead.error.message}
-          </Alert>
-        )}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" type="button" onClick={onClose}>Hủy</Button>
-          <Button type="submit" loading={createLead.isPending}>Lưu Lead</Button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 
 function HopThoaiChamSocLead({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const updateContact = useUpdateLeadContact()
@@ -675,6 +586,100 @@ function HopThoaiChamSocLead({ lead, onClose }: { lead: Lead; onClose: () => voi
           <Button type="submit" loading={updateContact.isPending || createLead.isPending}>
             Lưu nhật ký chăm sóc
           </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/**
+ * Sửa thông tin chung của Lead (tên/SĐT/email/nguồn) khi nhập sai lúc tạo —
+ * khác "Chăm sóc" (chỉ ghi tương tác, không sửa danh tính khách).
+ */
+function HopThoaiSuaLead({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+  const updateLead = useUpdateLead()
+  const { data: goiTaps } = useMemberships()
+
+  const [fullName, setFullName] = useState(lead.fullName)
+  const [phone, setPhone] = useState(lead.phone)
+  const [email, setEmail] = useState(lead.email ?? '')
+  const [source, setSource] = useState<LeadSource>(lead.source)
+  const [membershipId, setMembershipId] = useState<number | ''>(lead.interestedMembershipId ?? '')
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fullName.trim() || !phone.trim()) return
+
+    updateLead.mutate(
+      {
+        leadId: lead.id,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        source,
+        interestedMembershipId: membershipId ? Number(membershipId) : undefined,
+      },
+      { onSuccess: onClose }
+    )
+  }
+
+  return (
+    <Modal open={true} title={`Sửa thông tin Lead: ${lead.fullName}`} onClose={onClose}>
+      <form onSubmit={handleSave} className="space-y-4">
+        {updateLead.error instanceof ApiError && (
+          <Alert tone="error">
+            {updateLead.error.fields
+              ? Object.values(updateLead.error.fields).join(', ')
+              : updateLead.error.message}
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input label="Họ và tên *" value={fullName}
+                 onChange={(e) => setFullName(e.target.value)} required />
+          <Input label="Số điện thoại *" value={phone}
+                 onChange={(e) => setPhone(e.target.value)} required />
+        </div>
+
+        <Input label="Email" type="email" value={email}
+               onChange={(e) => setEmail(e.target.value)} />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nguồn tiếp nhận</label>
+            <select
+              value={source}
+              onChange={(e) => setSource(e.target.value as LeadSource)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="WALK_IN">Đến quầy trực tiếp (WALK_IN)</option>
+              <option value="HOTLINE">Gọi Hotline hỏi giá (HOTLINE)</option>
+              <option value="WEB_FORM">Để lại số trên Website (WEB_FORM)</option>
+              <option value="REFERRAL">Hội viên cũ giới thiệu (REFERRAL)</option>
+              <option value="APP_SELF">Tự đăng ký App (APP_SELF)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Gói quan tâm</label>
+            <select
+              value={membershipId}
+              onChange={(e) => setMembershipId(e.target.value ? Number(e.target.value) : '')}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">-- Chưa rõ / Tư vấn sau --</option>
+              {goiTaps?.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({tien(g.price)})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" type="button" onClick={onClose}>Hủy</Button>
+          <Button type="submit" loading={updateLead.isPending}>Lưu</Button>
         </div>
       </form>
     </Modal>

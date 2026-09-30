@@ -17,7 +17,9 @@ export function ThongKePage() {
 
   if (isLoading) return <Spinner />
 
-  const muc = Object.entries(thongKe ?? {})
+  // DENIED_ALREADY_INSIDE là quét trùng khi đã ở trong phòng (không phải hành vi gian lận
+  // cần chặn) — ẩn khỏi thống kê để không lẫn với các lượt chặn chống thất thoát thật sự.
+  const muc = Object.entries(thongKe ?? {}).filter(([k]) => k !== 'DENIED_ALREADY_INSIDE')
   const tong = muc.reduce((s, [, v]) => s + v, 0)
   const choVao = muc.filter(([k]) => k.startsWith('ALLOWED')).reduce((s, [, v]) => s + v, 0)
   const biChan = tong - choVao

@@ -16,7 +16,7 @@ const MENU: MucMenu[] = [
   { to: '/check-in', nhan: 'Check-in', vaiTro: ['MEMBER'] },
   { to: '/phan-hoi', nhan: 'Phản hồi', vaiTro: ['MEMBER'] },
   { to: '/quan-ly-phan-hoi', nhan: 'Xử lý phản hồi', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
-  { to: '/ban-hang', nhan: 'Bán hàng (CRM)', vaiTro: ['SALE', 'RECEPTIONIST', 'ADMIN'] },
+  { to: '/ban-hang', nhan: 'Bán hàng (CRM)', vaiTro: ['SALE', 'ADMIN'] },
   { to: '/lich-day', nhan: 'Lịch dạy', vaiTro: ['TRAINER'] },
   { to: '/danh-gia-cua-toi', nhan: 'Đánh giá về tôi', vaiTro: ['TRAINER'] },
   { to: '/quay', nhan: 'Màn hình quầy', vaiTro: ['RECEPTIONIST', 'ADMIN'] },
@@ -25,6 +25,7 @@ const MENU: MucMenu[] = [
   { to: '/thong-ke', nhan: 'Thống kê', vaiTro: ['ADMIN', 'ACCOUNTANT'] },
   { to: '/quan-tri', nhan: 'Dashboard', vaiTro: ['ADMIN'] },
   { to: '/quan-tri/nhan-vien', nhan: 'Nhân viên', vaiTro: ['ADMIN'] },
+  { to: '/quan-tri/goi-tap', nhan: 'Gói tập', vaiTro: ['ADMIN'] },
 ]
 
 export function Layout() {
