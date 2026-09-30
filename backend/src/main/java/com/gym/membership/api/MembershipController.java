@@ -1,15 +1,22 @@
 package com.gym.membership.api;
 
+import com.gym.membership.api.dto.CreateMembershipRequest;
+import com.gym.membership.api.dto.MembershipAdminResponse;
 import com.gym.membership.api.dto.MembershipResponse;
+import com.gym.membership.api.dto.UpdateMembershipRequest;
 import com.gym.membership.service.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "Gói tập", description = "Bảng giá công khai")
+@Tag(name = "Gói tập", description = "Bảng giá công khai + quản lý gói tập (Admin)")
 @RestController
 @RequestMapping("/api/v1/memberships")
 @RequiredArgsConstructor
@@ -32,5 +39,37 @@ public class MembershipController {
     @GetMapping("/{id}")
     public MembershipResponse getById(@PathVariable Long id) {
         return membershipService.getById(id);
+    }
+
+    @Operation(summary = "Danh sách gói tập cho Admin quản lý",
+            description = "Khác GET công khai ở chỗ trả về CẢ gói đã ngừng bán (ARCHIVED).")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin")
+    public List<MembershipAdminResponse> listForAdmin() {
+        return membershipService.listAllForAdmin();
+    }
+
+    @Operation(summary = "Thêm gói tập mới")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping
+    public ResponseEntity<MembershipAdminResponse> create(@Valid @RequestBody CreateMembershipRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(membershipService.create(req));
+    }
+
+    @Operation(summary = "Sửa gói tập",
+            description = "Sửa cả giá, mô tả lẫn trạng thái bán (ACTIVE/ARCHIVED).")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}")
+    public MembershipAdminResponse update(@PathVariable Long id, @Valid @RequestBody UpdateMembershipRequest req) {
+        return membershipService.update(id, req);
+    }
+
+    @Operation(summary = "Xóa gói tập",
+            description = "Xóa mềm — hợp đồng cũ đã dùng gói này không bị ảnh hưởng.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        membershipService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

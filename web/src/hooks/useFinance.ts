@@ -146,6 +146,29 @@ export function useCreateExpense() {
   })
 }
 
+export function useUpdateExpense() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number
+      category: ExpenseCategory
+      title: string
+      amount: number
+      spentAt: string
+      paymentMethod: PaymentMethod
+      receiptUrl?: string
+      note?: string
+    }) => api.put<Expense>(`/finance/expenses/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['finance', 'expenses'] })
+      qc.invalidateQueries({ queryKey: ['finance', 'profit-loss'] })
+    },
+  })
+}
+
 export function useDeleteExpense() {
   const qc = useQueryClient()
   return useMutation({

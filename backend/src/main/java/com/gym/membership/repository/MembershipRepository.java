@@ -13,4 +13,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
 
     /** Bảng giá công khai — chỉ gói đang bán, theo thứ tự hiển thị đã đặt. */
     List<Membership> findByStatusAndDeletedAtIsNullOrderByDisplayOrderAsc(MembershipStatus status);
+
+    /** Quản lý — Admin thấy mọi gói chưa xóa, kể cả gói đã ngừng bán (ARCHIVED). */
+    List<Membership> findByDeletedAtIsNullOrderByDisplayOrderAsc();
 }

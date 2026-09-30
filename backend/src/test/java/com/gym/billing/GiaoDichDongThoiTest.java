@@ -126,7 +126,11 @@ class GiaoDichDongThoiTest {
                             PaymentMethod.BANK_TRANSFER, actorId, "TT-test");
                     thanhCong.incrementAndGet();
                 } catch (ApiException e) {
-                    if ("OVERPAY".equals(e.getCode())) {
+                    // Vì nợ (1.000.000) chia hết cho mỗi khoản (200.000), khoản thu thứ 6 trở
+                    // đi luôn gặp đúng lúc hóa đơn vừa chuyển PAID (dư nợ = 0) — tùy thứ tự khóa
+                    // dòng hóa đơn, có thể bị chặn bởi ALREADY_PAID (đã đủ) hoặc OVERPAY (dư nợ
+                    // = 0 vẫn còn nhỏ hơn khoản đang thu), cả hai đều đúng nghĩa "bị chặn".
+                    if ("OVERPAY".equals(e.getCode()) || "ALREADY_PAID".equals(e.getCode())) {
                         vuotNo.incrementAndGet();
                     }
                 } catch (Exception ignored) { }

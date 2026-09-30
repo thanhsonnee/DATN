@@ -1,5 +1,6 @@
 package com.gym.identity.api;
 
+import com.gym.identity.api.dto.EmployeeBriefResponse;
 import com.gym.identity.api.dto.TrainerResponse;
 import com.gym.identity.service.EmployeeLookupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,5 +24,12 @@ public class EmployeeController {
     @GetMapping("/trainers")
     public List<TrainerResponse> trainers() {
         return employeeLookupService.trainers();
+    }
+
+    @Operation(summary = "Danh sách nhân viên Sale đang hoạt động",
+            description = "Lễ tân chọn Sale phụ trách bằng TÊN khi tạo lead tại quầy.")
+    @GetMapping("/sales")
+    public List<EmployeeBriefResponse> sales() {
+        return employeeLookupService.sales();
     }
 }

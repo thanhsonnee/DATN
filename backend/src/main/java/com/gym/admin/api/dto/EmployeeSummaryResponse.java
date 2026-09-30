@@ -4,6 +4,7 @@ import com.gym.identity.domain.Department;
 import com.gym.identity.domain.Employee;
 import com.gym.identity.domain.EmployeeStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /** Một dòng trong danh sách nhân viên đã có tài khoản — không có mật khẩu. */
@@ -16,7 +17,8 @@ public record EmployeeSummaryResponse(
         Department department,
         String position,
         EmployeeStatus status,
-        LocalDate startDate
+        LocalDate startDate,
+        BigDecimal baseSalary
 ) {
     public static EmployeeSummaryResponse from(Employee e) {
         return new EmployeeSummaryResponse(
@@ -28,6 +30,7 @@ public record EmployeeSummaryResponse(
                 e.getDepartment(),
                 e.getPosition(),
                 e.getStatus(),
-                e.getStartDate());
+                e.getStartDate(),
+                e.getBaseSalary());
     }
 }

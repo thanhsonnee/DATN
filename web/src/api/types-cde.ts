@@ -169,6 +169,45 @@ export interface MemberPhotoResponse {
   photoUrl: string
 }
 
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER'
+
+export type MemberGoal = 'LOSE_FAT' | 'GAIN_MUSCLE' | 'ENDURANCE' | 'HEALTH'
+
+export type MemberSource = 'WALK_IN' | 'HOTLINE' | 'WEB_FORM' | 'REFERRAL' | 'APP_SELF'
+
+/** Hồ sơ đầy đủ hội viên — dùng để nạp sẵn form sửa tại quầy. Không có field để sửa SĐT. */
+export interface MemberProfile {
+  memberId: number
+  memberCode: string
+  phone: string
+  fullName: string
+  gender: Gender | null
+  birthday: string | null
+  nationalId: string | null
+  email: string | null
+  address: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+  healthNote: string | null
+  goal: MemberGoal | null
+  source: MemberSource | null
+}
+
+/** Body sửa hồ sơ hội viên — khớp UpdateMemberProfileRequest ở backend, không có phone. */
+export interface UpdateMemberProfileInput {
+  fullName?: string
+  gender?: Gender
+  birthday?: string
+  nationalId?: string
+  email?: string
+  address?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  healthNote?: string
+  goal?: MemberGoal
+  source?: MemberSource
+}
+
 export interface Trainer {
   id: number
   employeeCode: string
@@ -178,6 +217,13 @@ export interface Trainer {
   bio: string | null
   ratingAvg: number | null
   ratingCount: number | null
+}
+
+/** Nhân sự rút gọn để hiển thị trong danh sách chọn (vd. chọn Sale phụ trách khi tạo Lead). */
+export interface EmployeeBrief {
+  id: number
+  employeeCode: string
+  fullName: string
 }
 
 // ------------------------------------------------------------ Tài chính nâng cao (E3, E4, E5)
@@ -308,6 +354,9 @@ export interface Lead {
   assignedToId: number | null
   assignedToName: string | null
   assignedToCode: string | null
+  createdById: number | null
+  createdByName: string | null
+  createdByRole: string | null
   stage: LeadStage
   lostReason: LostReason | null
   lastContactAt: string | null
@@ -405,6 +454,7 @@ export interface EmployeeSummary {
   position: string | null
   status: EmployeeStatus
   startDate: string
+  baseSalary: number
 }
 
 export interface AdminMembersOverview {

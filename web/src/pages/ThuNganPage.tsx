@@ -5,7 +5,7 @@ import {
 import {
   useRevenueReport, useScanRevenue,
   usePayrollRuns, usePayrollDetail, useCalculatePayroll, useUpdatePayrollItem, useApprovePayroll, usePayPayroll,
-  useExpenses, useCreateExpense, useDeleteExpense, useProfitLossReport,
+  useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useProfitLossReport,
 } from '@/hooks/useFinance'
 import { ChoThanhToan } from '@/components/ChoThanhToan'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -19,7 +19,7 @@ import { ApiError } from '@/api/client'
 import { tien } from '@/lib/format'
 import { ngayGio, tenHinhThucThanhToan, tenTrangThaiHoaDon } from '@/lib/format-cde'
 import { useAuth } from '@/stores/auth'
-import type { PaymentMethod, ExpenseCategory, PayrollRun } from '@/api/types-cde'
+import type { PaymentMethod, ExpenseCategory, Expense, PayrollRun } from '@/api/types-cde'
 
 type TabType = 'THU_NGAN' | 'DOANH_THU' | 'BANG_LUONG' | 'CHI_PHI'
 
@@ -858,6 +858,7 @@ function TabChiPhiVaLoiNhuan() {
   const { data: pnl, isLoading: isPnlLoading } = useProfitLossReport(month, year)
   const { data: expenses, isLoading: isExpLoading } = useExpenses()
   const deleteExpense = useDeleteExpense()
+  const [dangSuaChiPhi, setDangSuaChiPhi] = useState<Expense | null>(null)
 
   if (isPnlLoading || isExpLoading) return <Spinner />
 
@@ -969,7 +970,13 @@ function TabChiPhiVaLoiNhuan() {
                       <td className="px-5 py-3 text-right font-bold text-red-600">-{tien(e.amount)}</td>
                       <td className="px-5 py-3 text-xs text-slate-600">{tenHinhThucThanhToan(e.paymentMethod)}</td>
                       <td className="px-5 py-3 text-xs text-slate-500">{e.spentByName ?? '—'}</td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-right space-x-2 whitespace-nowrap">
+                        <button
+                          onClick={() => setDangSuaChiPhi(e)}
+                          className="text-xs text-slate-600 hover:text-slate-900 font-semibold"
+                        >
+                          Sửa
+                        </button>
                         <button
                           onClick={() => {
                             if (window.confirm(`Xóa khoản chi "${e.title}" (${tien(e.amount)})? Không thể hoàn tác.`)) {
@@ -991,6 +998,10 @@ function TabChiPhiVaLoiNhuan() {
       </Card>
 
       <HopThoaiThemChiPhi open={openCreate} onClose={() => setOpenCreate(false)} />
+
+      {dangSuaChiPhi && (
+        <HopThoaiSuaChiPhi expense={dangSuaChiPhi} onClose={() => setDangSuaChiPhi(null)} />
+      )}
     </div>
   )
 }
@@ -1100,6 +1111,109 @@ function HopThoaiThemChiPhi({ open, onClose }: { open: boolean; onClose: () => v
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" type="button" onClick={onClose}>Hủy</Button>
           <Button type="submit" loading={createExp.isPending}>Lưu khoản chi</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/** Sửa khoản chi nhập sai (số tiền, tiêu đề, ngày chi...). */
+function HopThoaiSuaChiPhi({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+  const updateExp = useUpdateExpense()
+
+  const [category, setCategory] = useState<ExpenseCategory>(expense.category)
+  const [title, setTitle] = useState(expense.title)
+  const [amount, setAmount] = useState(String(expense.amount))
+  const [spentAt, setSpentAt] = useState(expense.spentAt)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(expense.paymentMethod)
+  const [note, setNote] = useState(expense.note ?? '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title || !amount) return
+
+    updateExp.mutate(
+      {
+        id: expense.id,
+        category,
+        title: title.trim(),
+        amount: Number(amount),
+        spentAt,
+        paymentMethod,
+        note: note.trim() || undefined,
+      },
+      { onSuccess: onClose }
+    )
+  }
+
+  return (
+    <Modal open title={`Sửa khoản chi — ${expense.expenseNo}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Danh mục chi phí *</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="UTILITIES">Điện / Nước / Internet (UTILITIES)</option>
+            <option value="RENT">Tiền thuê mặt bằng (RENT)</option>
+            <option value="EQUIPMENT_MAINTENANCE">Bảo trì máy móc / Thiết bị (EQUIPMENT_MAINTENANCE)</option>
+            <option value="MARKETING">Quảng cáo / Marketing (MARKETING)</option>
+            <option value="SUPPLIES">Vật tư / Dụng cụ / Nước uống (SUPPLIES)</option>
+            <option value="OTHER">Chi phí khác (OTHER)</option>
+          </select>
+        </div>
+
+        <Input
+          label="Tiêu đề khoản chi *"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Số tiền (VND) *"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <Input
+            label="Ngày chi *"
+            type="date"
+            value={spentAt}
+            onChange={(e) => setSpentAt(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Hình thức thanh toán</label>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="BANK_TRANSFER">Chuyển khoản (BANK_TRANSFER)</option>
+            <option value="CASH">Tiền mặt (CASH)</option>
+            <option value="CARD_POS">Thẻ POS (CARD_POS)</option>
+            <option value="E_WALLET">Ví điện tử (E_WALLET)</option>
+          </select>
+        </div>
+
+        <Input
+          label="Ghi chú"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+
+        {updateExp.error instanceof ApiError && <Alert tone="error">{updateExp.error.message}</Alert>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" type="button" onClick={onClose}>Hủy</Button>
+          <Button type="submit" loading={updateExp.isPending}>Lưu</Button>
         </div>
       </form>
     </Modal>

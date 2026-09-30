@@ -3,6 +3,7 @@ package com.gym.admin.api;
 import com.gym.admin.api.dto.CreateEmployeeAccountRequest;
 import com.gym.admin.api.dto.EmployeeAccountResponse;
 import com.gym.admin.api.dto.EmployeeSummaryResponse;
+import com.gym.admin.api.dto.UpdateEmployeeRequest;
 import com.gym.admin.service.AdminEmployeeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,5 +40,15 @@ public class AdminEmployeeController {
     @GetMapping
     public List<EmployeeSummaryResponse> danhSach() {
         return service.danhSachNhanVien();
+    }
+
+    @Operation(summary = "Sửa nhân viên",
+            description = "Chỉ sửa được họ tên và lương cơ bản — không sửa SĐT (là username đăng "
+                        + "nhập) hay vai trò qua API này.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}")
+    public EmployeeSummaryResponse suaNhanVien(@PathVariable Long id,
+                                                @Valid @RequestBody UpdateEmployeeRequest req) {
+        return service.capNhatNhanVien(id, req);
     }
 }

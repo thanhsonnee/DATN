@@ -2,6 +2,7 @@ package com.gym.sales.domain;
 
 import com.gym.identity.domain.Employee;
 import com.gym.identity.domain.Person;
+import com.gym.identity.domain.User;
 import com.gym.membership.domain.Membership;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -43,6 +44,10 @@ public class Lead {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to")
     private Employee assignedTo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "stage", nullable = false, length = 20)

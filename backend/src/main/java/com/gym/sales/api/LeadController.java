@@ -42,8 +42,8 @@ public class LeadController {
     }
 
     @Operation(summary = "Tra cứu danh sách Leads",
-            description = "Lọc theo giai đoạn phễu hoặc nhân viên phụ trách.")
-    @PreAuthorize("hasAnyRole('SALE','RECEPTIONIST','ADMIN')")
+            description = "Lọc theo giai đoạn phễu hoặc nhân viên phụ trách. Chỉ Sale/Admin xem được toàn bộ phễu CRM.")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
     @GetMapping
     public List<LeadResponse> getLeads(@RequestParam(required = false) LeadStage stage,
                                        @RequestParam(required = false) Long assignedTo) {
@@ -51,7 +51,7 @@ public class LeadController {
     }
 
     @Operation(summary = "Chi tiết một Lead")
-    @PreAuthorize("hasAnyRole('SALE','RECEPTIONIST','ADMIN')")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
     @GetMapping("/{id}")
     public LeadResponse getLeadById(@PathVariable Long id) {
         return leadService.getLeadById(id);
@@ -66,12 +66,30 @@ public class LeadController {
     }
 
     @Operation(summary = "Ghi nhận tương tác và chuyển giai đoạn phễu",
-            description = "Ghi lại nội dung cuộc gọi/tư vấn và hẹn ngày liên hệ tiếp theo.")
-    @PreAuthorize("hasAnyRole('SALE','RECEPTIONIST','ADMIN')")
+            description = "Ghi lại nội dung cuộc gọi/tư vấn và hẹn ngày liên hệ tiếp theo. Lead chưa có "
+                        + "Sale phụ trách thì tự động gán cho Sale đang lưu nhật ký này.")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
     @PutMapping("/{id}/contact")
-    public LeadResponse updateContact(@PathVariable Long id,
+    public LeadResponse updateContact(@AuthenticationPrincipal Long userId,
+                                      @PathVariable Long id,
                                       @Valid @RequestBody UpdateLeadContactRequest req) {
-        return leadService.updateContact(id, req);
+        return leadService.updateContact(id, req, userId);
+    }
+
+    @Operation(summary = "Sửa thông tin chung của Lead",
+            description = "Sửa tên/SĐT/email/nguồn khi nhập sai lúc tạo — khác /contact (chỉ ghi tương tác).")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
+    @PutMapping("/{id}")
+    public LeadResponse updateLead(@PathVariable Long id, @Valid @RequestBody UpdateLeadRequest req) {
+        return leadService.updateLead(id, req);
+    }
+
+    @Operation(summary = "Xóa Lead", description = "Dùng khi lead trùng/spam nhập nhầm. Xóa mềm.")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteLead(@PathVariable Long id) {
+        leadService.deleteLead(id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Đánh dấu Lead thất bại",
@@ -84,7 +102,7 @@ public class LeadController {
     }
 
     @Operation(summary = "Danh sách khách đã tải app nhưng chưa mua gói (APP_SELF)")
-    @PreAuthorize("hasAnyRole('SALE','RECEPTIONIST','ADMIN')")
+    @PreAuthorize("hasAnyRole('SALE','ADMIN')")
     @GetMapping("/app-users")
     public List<AppUserLeadResponse> getAppRegisteredLeads() {
         return leadService.getAppRegisteredLeads();

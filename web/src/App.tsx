@@ -22,6 +22,7 @@ import { DanhGiaCuaToiPage } from '@/pages/DanhGiaCuaToiPage'
 import { TuCheckInPage } from '@/pages/TuCheckInPage'
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage'
 import { QuanLyNhanVienPage } from '@/pages/QuanLyNhanVienPage'
+import { QuanLyGoiTapPage } from '@/pages/QuanLyGoiTapPage'
 
 export default function App() {
   const { user, loading, restore } = useAuth()
@@ -64,7 +65,7 @@ export default function App() {
         <Route path="/quan-ly-phan-hoi"
                element={canQuyen(<QuanLyPhanHoiPage />, ['RECEPTIONIST', 'ADMIN'])} />
         <Route path="/ban-hang"
-               element={canQuyen(<BanHangPage />, ['SALE', 'RECEPTIONIST', 'ADMIN'])} />
+               element={canQuyen(<BanHangPage />, ['SALE', 'ADMIN'])} />
         <Route path="/lich-day"
                element={canQuyen(<LichDayPage />, ['TRAINER'])} />
         <Route path="/danh-gia-cua-toi"
@@ -82,6 +83,8 @@ export default function App() {
                element={canQuyen(<AdminDashboardPage />, ['ADMIN'])} />
         <Route path="/quan-tri/nhan-vien"
                element={canQuyen(<QuanLyNhanVienPage />, ['ADMIN'])} />
+        <Route path="/quan-tri/goi-tap"
+               element={canQuyen(<QuanLyGoiTapPage />, ['ADMIN'])} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

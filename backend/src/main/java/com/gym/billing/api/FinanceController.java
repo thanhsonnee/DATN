@@ -130,6 +130,13 @@ public class FinanceController {
         return expenseService.getExpenses(from, to, category);
     }
 
+    @Operation(summary = "Sửa khoản chi", description = "Sửa khoản chi nhập sai (số tiền, tiêu đề, ngày chi...).")
+    @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
+    @PutMapping("/expenses/{id}")
+    public ExpenseResponse updateExpense(@PathVariable Long id, @Valid @RequestBody UpdateExpenseRequest req) {
+        return expenseService.updateExpense(id, req);
+    }
+
     @Operation(summary = "Xóa khoản chi")
     @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
     @DeleteMapping("/expenses/{id}")

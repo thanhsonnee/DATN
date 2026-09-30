@@ -1,5 +1,6 @@
 package com.gym.identity.service;
 
+import com.gym.identity.api.dto.EmployeeBriefResponse;
 import com.gym.identity.api.dto.TrainerResponse;
 import com.gym.identity.domain.Department;
 import com.gym.identity.domain.EmployeeStatus;
@@ -30,6 +31,15 @@ public class EmployeeLookupService {
         return employeeRepo.findByDepartmentAndDeletedAtIsNull(Department.TRAINING).stream()
                 .filter(e -> e.getStatus() == EmployeeStatus.ACTIVE && e.getLevel() != null)
                 .map(TrainerResponse::from)
+                .toList();
+    }
+
+    /** Sale đang hoạt động — để lễ tân chọn người phụ trách khi tạo lead tại quầy. */
+    @Transactional(readOnly = true)
+    public List<EmployeeBriefResponse> sales() {
+        return employeeRepo.findByDepartmentAndDeletedAtIsNull(Department.SALES).stream()
+                .filter(e -> e.getStatus() == EmployeeStatus.ACTIVE)
+                .map(EmployeeBriefResponse::from)
                 .toList();
     }
 }

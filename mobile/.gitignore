@@ -39,4 +39,5 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-mobile/*.apk
+*.apk
+*.aab

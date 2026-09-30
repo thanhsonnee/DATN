@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/stores/auth'
 import {
   useCreateEquipment, useEquipmentList, useFeedbackQueue, useUpdateFeedbackStatus,
+  useUpdateEquipment, useDeleteEquipment,
 } from '@/hooks/useFeedback'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -14,7 +15,7 @@ import { ApiError } from '@/api/client'
 import {
   ngayGio, tenLoaiPhanHoi, tenTrangThaiPhanHoi, tenTrangThaiThietBi,
 } from '@/lib/format-cde'
-import type { Feedback, FeedbackStatus, FeedbackType } from '@/api/types-cde'
+import type { Equipment, Feedback, FeedbackStatus, FeedbackType } from '@/api/types-cde'
 
 // Khi chưa lọc theo trạng thái cụ thể, chỉ RESOLVED/CLOSED mới gộp vào lịch
 // sử thu gọn — các trạng thái còn lại đều còn cần xử lý, luôn hiện đầy đủ.
@@ -42,7 +43,9 @@ export function QuanLyPhanHoiPage() {
   const { data: hangDoi, isLoading } = useFeedbackQueue(locStatus || undefined, locType || undefined)
   const { data: equipment } = useEquipmentList()
   const capNhat = useUpdateFeedbackStatus()
+  const deleteThietBi = useDeleteEquipment()
   const [moDaDong, setMoDaDong] = useState(false)
+  const [dangSuaThietBi, setDangSuaThietBi] = useState<Equipment | null>(null)
 
   const [dangXuLy, setDangXuLy] = useState<Feedback | null>(null)
   const [trangThaiMoi, setTrangThaiMoi] = useState<FeedbackStatus>('IN_PROGRESS')
@@ -127,9 +130,31 @@ export function QuanLyPhanHoiPage() {
                     <p className="text-sm font-medium text-slate-900">{eq.name}</p>
                     {eq.roomName && <p className="text-xs text-slate-500">{eq.roomName}</p>}
                   </div>
-                  <Badge tone={eq.status === 'ACTIVE' ? 'green' : eq.status === 'NEEDS_REPAIR' ? 'red' : 'amber'}>
-                    {tenTrangThaiThietBi(eq.status)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={eq.status === 'ACTIVE' ? 'green' : eq.status === 'NEEDS_REPAIR' ? 'red' : 'amber'}>
+                      {tenTrangThaiThietBi(eq.status)}
+                    </Badge>
+                    {user?.role === 'ADMIN' && (
+                      <>
+                        <button
+                          onClick={() => setDangSuaThietBi(eq)}
+                          className="text-xs text-slate-600 hover:text-slate-900 font-medium"
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Xóa thiết bị "${eq.name}"? Không thể hoàn tác.`)) {
+                              deleteThietBi.mutate(eq.id)
+                            }
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Xóa
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -200,7 +225,66 @@ export function QuanLyPhanHoiPage() {
           </div>
         </div>
       </Modal>
+
+      {dangSuaThietBi && (
+        <HopThoaiSuaThietBi thietBi={dangSuaThietBi} onClose={() => setDangSuaThietBi(null)} />
+      )}
     </div>
+  )
+}
+
+function HopThoaiSuaThietBi({ thietBi, onClose }: { thietBi: Equipment; onClose: () => void }) {
+  const suaThietBi = useUpdateEquipment()
+  const [ten, setTen] = useState(thietBi.name)
+  const [phong, setPhong] = useState(thietBi.roomName ?? '')
+  const [status, setStatus] = useState(thietBi.status)
+  const [ghiChu, setGhiChu] = useState(thietBi.note ?? '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!ten.trim()) return
+
+    suaThietBi.mutate(
+      {
+        id: thietBi.id,
+        name: ten.trim(),
+        roomName: phong.trim() || undefined,
+        status,
+        note: ghiChu.trim() || undefined,
+      },
+      { onSuccess: onClose }
+    )
+  }
+
+  return (
+    <Modal open title={`Sửa thiết bị: ${thietBi.name}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {suaThietBi.error instanceof ApiError && <Alert tone="error">{suaThietBi.error.message}</Alert>}
+
+        <Input label="Tên thiết bị *" value={ten} onChange={(e) => setTen(e.target.value)} required />
+        <Input label="Khu/phòng" value={phong} onChange={(e) => setPhong(e.target.value)} />
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Trạng thái</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as Equipment['status'])}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            {(['ACTIVE', 'NEEDS_REPAIR', 'UNDER_REPAIR', 'RETIRED'] as const).map((s) => (
+              <option key={s} value={s}>{tenTrangThaiThietBi(s)}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Bình thường NEEDS_REPAIR tự chuyển khi có phản hồi báo hỏng — chỉ đổi tay khi cần (vd. RETIRED khi thanh lý).
+          </p>
+        </div>
+
+        <Input label="Ghi chú" value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} />
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
+          <Button type="submit" loading={suaThietBi.isPending}>Lưu</Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

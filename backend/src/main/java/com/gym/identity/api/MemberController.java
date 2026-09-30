@@ -1,9 +1,12 @@
 package com.gym.identity.api;
 
+import com.gym.identity.api.dto.MemberProfileResponse;
 import com.gym.identity.api.dto.MemberSearchResult;
+import com.gym.identity.api.dto.UpdateMemberProfileRequest;
 import com.gym.identity.service.MemberLookupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -43,5 +46,23 @@ public class MemberController {
     @DeleteMapping("/{memberId}/photo")
     public com.gym.identity.api.dto.MemberPhotoResponse deletePhoto(@PathVariable Long memberId) {
         return memberLookupService.deletePhoto(memberId);
+    }
+
+    @Operation(summary = "Hồ sơ đầy đủ của một hội viên",
+            description = "Dùng để nạp sẵn form sửa thông tin cá nhân tại quầy.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @GetMapping("/{memberId}")
+    public MemberProfileResponse layThongTin(@PathVariable Long memberId) {
+        return memberLookupService.layThongTin(memberId);
+    }
+
+    @Operation(summary = "Sửa thông tin cá nhân hội viên",
+            description = "Không sửa được số điện thoại qua API này — SĐT là tên đăng nhập, "
+                        + "đổi cần đồng bộ riêng (chưa triển khai).")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ADMIN')")
+    @PutMapping("/{memberId}")
+    public MemberProfileResponse suaThongTin(@PathVariable Long memberId,
+                                              @Valid @RequestBody UpdateMemberProfileRequest req) {
+        return memberLookupService.capNhatThongTin(memberId, req);
     }
 }
