@@ -32,21 +32,23 @@ public class MembershipController {
         return membershipService.listOnSale();
     }
 
-    @Operation(summary = "[CHƯA DÙNG] Chi tiết một gói tập",
-            description = "Hiện chưa có nơi nào trong frontend gọi API này — trang Bảng giá "
-                        + "hiện toàn bộ gói cùng lúc từ GET /memberships, chưa có màn hình "
-                        + "xem chi tiết riêng từng gói.")
-    @GetMapping("/{id}")
-    public MembershipResponse getById(@PathVariable Long id) {
-        return membershipService.getById(id);
-    }
-
     @Operation(summary = "Danh sách gói tập cho Admin quản lý",
             description = "Khác GET công khai ở chỗ trả về CẢ gói đã ngừng bán (ARCHIVED).")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
     public List<MembershipAdminResponse> listForAdmin() {
         return membershipService.listAllForAdmin();
+    }
+
+    @Operation(summary = "[CHƯA DÙNG] Chi tiết một gói tập",
+            description = "Hiện chưa có nơi nào trong frontend gọi API này — trang Bảng giá "
+                        + "hiện toàn bộ gói cùng lúc từ GET /memberships, chưa có màn hình "
+                        + "xem chi tiết riêng từng gói. Khai báo SAU route /admin cụ thể hơn — "
+                        + "đứng trước sẽ nuốt mất /admin (Spring khớp /{id} trước, ép "
+                        + "\"admin\" thành Long, lỗi 500 — đã xảy ra thật trên production).")
+    @GetMapping("/{id}")
+    public MembershipResponse getById(@PathVariable Long id) {
+        return membershipService.getById(id);
     }
 
     @Operation(summary = "Thêm gói tập mới")
