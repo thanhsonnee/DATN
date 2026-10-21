@@ -17,6 +17,7 @@ node_modules/
 dist/
 build/
 .expo/
+*.tsbuildinfo
 
 # Build cài đặt mobile (APK/AAB) — file nhị phân, không thuộc source control
 *.apk
