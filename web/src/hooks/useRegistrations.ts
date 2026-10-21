@@ -37,6 +37,22 @@ export function useExpiringRegistrations(days = 14) {
   })
 }
 
+/**
+ * Hợp đồng do Sales chốt trong 1 tháng — Admin xem trên CRM. Bỏ trống = tháng hiện tại.
+ * LƯU Ý: không bắt được hợp đồng khách tự mua online hoặc Lễ tân tạo hộ (xem BE).
+ */
+export function useSalesClosedThisMonth(month?: number, year?: number) {
+  const params = new URLSearchParams()
+  if (month) params.set('month', String(month))
+  if (year) params.set('year', String(year))
+  const qs = params.toString() ? `?${params.toString()}` : ''
+
+  return useQuery({
+    queryKey: ['registrations', 'sales-closed', month ?? null, year ?? null],
+    queryFn: () => api.get<Registration[]>(`/registrations/sales-closed${qs}`),
+  })
+}
+
 export interface MuaGoiInput {
   membershipId: number
   discountAmount?: number

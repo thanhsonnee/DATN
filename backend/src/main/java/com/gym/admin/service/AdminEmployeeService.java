@@ -3,6 +3,7 @@ package com.gym.admin.service;
 import com.gym.admin.api.dto.CreateEmployeeAccountRequest;
 import com.gym.admin.api.dto.EmployeeAccountResponse;
 import com.gym.admin.api.dto.EmployeeSummaryResponse;
+import com.gym.admin.api.dto.ResetPasswordResponse;
 import com.gym.admin.api.dto.UpdateEmployeeRequest;
 import com.gym.common.exception.ApiException;
 import com.gym.common.util.CodeGenerator;
@@ -140,6 +141,37 @@ public class AdminEmployeeService {
         log.info("Admin cập nhật nhân viên: employeeId={} employeeCode={}",
                 saved.getId(), saved.getEmployeeCode());
         return EmployeeSummaryResponse.from(saved);
+    }
+
+    /**
+     * Đặt lại mật khẩu cho MỌI vai trò (nhân viên lẫn hội viên) — tìm theo số
+     * điện thoại (= username đăng nhập). Dùng khi tài khoản quên mật khẩu hoặc
+     * bị khóa tạm do nhập sai nhiều lần, chưa có cách nào tự lấy lại (hệ thống
+     * chưa có luồng "quên mật khẩu" tự phục vụ qua email).
+     *
+     * <p>Xóa luôn mọi trạng thái khóa — nếu chỉ đổi mật khẩu mà không dọn
+     * {@code autoLockedUntil}/{@code status}, tài khoản vẫn kẹt dù đã có mật
+     * khẩu mới. Tăng {@code tokenVersion} để thu hồi các refresh token cũ
+     * (phòng trường hợp máy khác đang chiếm phiên).
+     */
+    @Transactional
+    public ResetPasswordResponse datLaiMatKhauTheoSdt(String phone) {
+        User user = userRepo.findByUsernameAndDeletedAtIsNull(phone)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản với số điện thoại này"));
+
+        String tempPassword = tempPasswordGenerator.generate();
+        user.setPasswordHash(passwordEncoder.encode(tempPassword));
+        user.setFailedAttempts((short) 0);
+        user.setAutoLockedUntil(null);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setLockedReason(null);
+        user.setLockedUntil(null);
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepo.save(user);
+
+        log.info("Admin đặt lại mật khẩu: userId={} role={}", user.getId(), user.getPrimaryRole());
+
+        return ResetPasswordResponse.of(user, tempPassword);
     }
 
     /** department phải khớp 1-1 với primary_role — ràng buộc đã có ở tầng CSDL (chk_emp_level_dept). */

@@ -6,6 +6,7 @@ import {
   useRevenueReport, useScanRevenue,
   usePayrollRuns, usePayrollDetail, useCalculatePayroll, useUpdatePayrollItem, useApprovePayroll, usePayPayroll,
   useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useProfitLossReport,
+  useDailyRevenue, useConfirmDailyRevenue,
 } from '@/hooks/useFinance'
 import { ChoThanhToan } from '@/components/ChoThanhToan'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -21,7 +22,7 @@ import { ngayGio, tenHinhThucThanhToan, tenTrangThaiHoaDon } from '@/lib/format-
 import { useAuth } from '@/stores/auth'
 import type { PaymentMethod, ExpenseCategory, Expense, PayrollRun } from '@/api/types-cde'
 
-type TabType = 'THU_NGAN' | 'DOANH_THU' | 'BANG_LUONG' | 'CHI_PHI'
+type TabType = 'THU_NGAN' | 'DOI_SOAT' | 'DOANH_THU' | 'BANG_LUONG' | 'CHI_PHI'
 
 /** Danh sách năm cho các bộ lọc kỳ báo cáo/lương/chi phí. */
 const CAC_NAM_CHON = [2025, 2026, 2027]
@@ -60,6 +61,15 @@ export function ThuNganPage() {
               Quầy thu ngân (E1-E2)
             </button>
           )}
+          {/* E6 — minh bạch dòng tiền giữa Lễ tân/Sale và Kế toán, cả 3 role đều xem được */}
+          <button
+            onClick={() => setTab('DOI_SOAT')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              tab === 'DOI_SOAT' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Đối soát thu tiền (E6)
+          </button>
           {xemDuocSoKeToan && (
             <>
               <button
@@ -92,6 +102,7 @@ export function ThuNganPage() {
       </div>
 
       {xemDuocQuayThuNgan && tab === 'THU_NGAN' && <TabThuNgan />}
+      {tab === 'DOI_SOAT' && <TabDoiSoatThuTien />}
       {xemDuocSoKeToan && tab === 'DOANH_THU' && <TabDoanhThuDonTich />}
       {xemDuocSoKeToan && tab === 'BANG_LUONG' && <TabBangLuong />}
       {xemDuocSoKeToan && tab === 'CHI_PHI' && <TabChiPhiVaLoiNhuan />}
@@ -404,6 +415,130 @@ function HopThoaiThuTien({
         </div>
       </div>
     </Modal>
+  )
+}
+
+// =============================================================================
+// TAB E6: Đối soát doanh thu theo ngày — minh bạch dòng tiền Lễ tân ↔ Kế toán
+// =============================================================================
+
+function ngayHomNayISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+function TabDoiSoatThuTien() {
+  const { user } = useAuth()
+  const coTheXacNhan = user?.role === 'ACCOUNTANT' || user?.role === 'ADMIN'
+
+  const [date, setDate] = useState(ngayHomNayISO())
+  const { data: dt, isLoading } = useDailyRevenue(date)
+  const xacNhan = useConfirmDailyRevenue()
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title="Đối soát doanh thu theo ngày"
+          subtitle="Mọi hình thức thanh toán (tiền mặt, chuyển khoản...) — không riêng tiền mặt trong két"
+        />
+        <CardBody className="space-y-4">
+          <Input label="Chọn ngày" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+          {isLoading || !dt ? (
+            <Spinner />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card>
+                  <CardBody>
+                    <span className="text-xs font-semibold uppercase text-slate-500">Tổng thu trong ngày</span>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{tien(dt.totalAmount)}</p>
+                  </CardBody>
+                </Card>
+                <Card>
+                  <CardBody>
+                    <span className="text-xs font-semibold uppercase text-slate-500">Đã xác nhận</span>
+                    <p className="mt-2 text-2xl font-bold text-emerald-700">{tien(dt.confirmedAmount)}</p>
+                  </CardBody>
+                </Card>
+                <Card>
+                  <CardBody>
+                    <span className="text-xs font-semibold uppercase text-slate-500">Còn chưa xác nhận</span>
+                    <p className={`mt-2 text-2xl font-bold ${dt.pendingAmount > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                      {tien(dt.pendingAmount)}
+                    </p>
+                  </CardBody>
+                </Card>
+              </div>
+
+              {xacNhan.error instanceof ApiError && <Alert tone="error">{xacNhan.error.message}</Alert>}
+
+              {dt.lines.length === 0 ? (
+                <EmptyState title="Chưa có khoản thu/hoàn tiền nào trong ngày này" />
+              ) : dt.daXacNhanDuDoanhThuTrongNgay ? (
+                <Alert tone="success">Đã xác nhận đủ toàn bộ doanh thu ngày {date}.</Alert>
+              ) : coTheXacNhan ? (
+                <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                  <p className="text-sm text-amber-800">
+                    Còn <b>{tien(dt.pendingAmount)}</b> chưa được xác nhận — kiểm tra đủ danh sách bên dưới rồi bấm xác nhận.
+                  </p>
+                  <Button loading={xacNhan.isPending} onClick={() => xacNhan.mutate(date)}>
+                    ✓ Xác nhận đã nhận đủ
+                  </Button>
+                </div>
+              ) : (
+                <Alert tone="info">
+                  Còn <b>{tien(dt.pendingAmount)}</b> chưa được Kế toán xác nhận.
+                </Alert>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3">Hợp đồng / Hóa đơn</th>
+                      <th className="px-5 py-3">Hội viên</th>
+                      <th className="px-5 py-3">Hình thức</th>
+                      <th className="px-5 py-3 text-right">Số tiền</th>
+                      <th className="px-5 py-3">Người thu</th>
+                      <th className="px-5 py-3">Thời điểm</th>
+                      <th className="px-5 py-3">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {dt.lines.map((l) => (
+                      <tr key={l.id} className="hover:bg-slate-50">
+                        <td className="px-5 py-3">
+                          <div className="font-mono text-xs text-slate-700">{l.registrationCode}</div>
+                          <div className="font-mono text-[11px] text-slate-400">{l.invoiceNo}</div>
+                        </td>
+                        <td className="px-5 py-3 font-medium text-slate-800">{l.memberName}</td>
+                        <td className="px-5 py-3 text-xs text-slate-600">{tenHinhThucThanhToan(l.method)}</td>
+                        <td className={`px-5 py-3 text-right font-bold ${l.amount < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                          {l.amount < 0 ? '' : '+'}{tien(l.amount)}
+                        </td>
+                        <td className="px-5 py-3 text-xs text-slate-500">{l.receivedByName ?? '—'}</td>
+                        <td className="px-5 py-3 text-xs text-slate-500">{ngayGio(l.paidAt)}</td>
+                        <td className="px-5 py-3">
+                          {l.daXacNhan ? (
+                            <Badge tone="green">Đã xác nhận</Badge>
+                          ) : (
+                            <Badge tone="amber">Chưa xác nhận</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   )
 }
 

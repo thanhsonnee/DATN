@@ -118,6 +118,9 @@ export interface Registration {
   endDate: string | null
   activatedAt: string | null
   status: RegistrationStatus
+  /** Nhân viên chốt hợp đồng tại quầy — null nếu khách tự mua online. */
+  soldById: number | null
+  soldByName: string | null
   freeze: FreezeInfo | null
   /** Hợp đồng cùng loại gói được nối tiếp (tự động hoặc gia hạn thủ công). `null` nếu đây là gói độc lập. */
   renewFromRegistrationId: number | null

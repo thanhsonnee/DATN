@@ -4,6 +4,7 @@ import com.gym.billing.api.dto.*;
 import com.gym.billing.domain.ExpenseCategory;
 import com.gym.billing.service.ExpenseService;
 import com.gym.billing.service.PayrollService;
+import com.gym.billing.service.RevenueConfirmationService;
 import com.gym.billing.service.RevenueRecognitionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,7 @@ public class FinanceController {
     private final RevenueRecognitionService revenueService;
     private final PayrollService payrollService;
     private final ExpenseService expenseService;
+    private final RevenueConfirmationService revenueConfirmationService;
 
     // =========================================================================
     // E3: Ghi nhận doanh thu dồn tích (Revenue Recognition)
@@ -150,5 +152,31 @@ public class FinanceController {
     @GetMapping("/profit-loss")
     public ProfitLossReportResponse getProfitLossReport(@RequestParam int month, @RequestParam int year) {
         return expenseService.getProfitLossReport(month, year);
+    }
+
+    // =========================================================================
+    // E6: Đối soát doanh thu theo ngày — minh bạch dòng tiền Lễ tân ↔ Kế toán
+    // =========================================================================
+
+    @Operation(summary = "Doanh thu trong ngày",
+            description = "Mọi khoản thu/hoàn tiền (mọi hình thức thanh toán) trong ngày, kèm trạng thái "
+                        + "đã được Kế toán xác nhận hay chưa. Bỏ trống `date` = hôm nay. Lễ tân xem được "
+                        + "để tự biết còn khoản nào chưa được xác nhận, nhưng không tự xác nhận được.")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST','ACCOUNTANT','ADMIN')")
+    @GetMapping("/daily-revenue")
+    public DailyRevenueResponse getDailyRevenue(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return revenueConfirmationService.layDoanhThuNgay(date != null ? date : LocalDate.now());
+    }
+
+    @Operation(summary = "Kế toán xác nhận đã nhận đủ tiền trong ngày",
+            description = "Xác nhận GỘP một lần cho mọi khoản chưa xác nhận của ngày đó — không duyệt "
+                        + "từng dòng. Khoản phát sinh sau khi xác nhận sẽ tự hiện lại \"chưa xác nhận\".")
+    @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
+    @PostMapping("/daily-revenue/{date}/confirm")
+    public DailyRevenueResponse confirmDailyRevenue(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @AuthenticationPrincipal Long userId) {
+        return revenueConfirmationService.xacNhan(date, userId);
     }
 }

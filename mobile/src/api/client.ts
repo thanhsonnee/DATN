@@ -122,7 +122,9 @@ async function request<T>(method: string, path: string, body?: unknown, daThuLam
     // Refresh cũng không cứu được → thật sự chưa đăng nhập/hết hạn.
     // 403 là đủ quyền đăng nhập nhưng không đủ quyền, KHÔNG được đăng xuất.
     // /auth/logout tự nó 401 thì KHÔNG được gọi lại onUnauthorized, tránh đệ quy.
-    if (res.status === 401 && path !== '/auth/logout') onUnauthorized?.();
+    // /auth/login tự nó 401 (gõ sai mật khẩu) cũng KHÔNG được gọi — chưa từng
+    // đăng nhập thì không có gì để "đăng xuất".
+    if (res.status === 401 && path !== '/auth/logout' && path !== '/auth/login') onUnauthorized?.();
 
     let payload: Partial<ApiErrorBody> = {};
     try {

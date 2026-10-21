@@ -105,7 +105,11 @@ async function request<T>(method: string, path: string, body?: unknown, daThuLam
     // /auth/logout tự nó 401 thì KHÔNG được gọi lại onUnauthorized (= logout())
     // — nếu không sẽ đệ quy vô hạn: logout() gọi /auth/logout, 401, gọi lại
     // onUnauthorized → logout() → /auth/logout → 401 → ... (đã xảy ra thật).
-    if (res.status === 401 && path !== '/auth/logout') onUnauthorized?.()
+    // /auth/login tự nó 401 (gõ sai mật khẩu) KHÔNG được gọi onUnauthorized —
+    // người dùng chưa từng đăng nhập, không có gì để "đăng xuất"; trước đây
+    // thiếu dòng loại trừ này nên mỗi lần gõ sai mật khẩu lại bắn thêm 1 lần
+    // gọi /auth/logout thừa.
+    if (res.status === 401 && path !== '/auth/logout' && path !== '/auth/login') onUnauthorized?.()
 
     let payload: Partial<ApiErrorBody> = {}
     try {

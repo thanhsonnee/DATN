@@ -47,8 +47,8 @@ export function Layout() {
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3">
           <Link to={trangChinhCuaVaiTro(user?.role)}
                 className="mr-2 flex shrink-0 items-center gap-2 font-semibold text-slate-900">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">G</span>
-            <span className="hidden lg:inline">Fitness Center</span>
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">FZ</span>
+            <span className="hidden lg:inline">FitZone Gym</span>
           </Link>
 
           <nav className="flex flex-1 items-center gap-1 overflow-x-auto">

@@ -102,6 +102,11 @@ public class Payment {
     @Column(name = "reconciled_at")
     private OffsetDateTime reconciledAt;
 
+    /** Kế toán xác nhận gộp 1 lần/ngày — mọi hình thức thanh toán, không riêng tiền mặt. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reconciled_by")
+    private User reconciledBy;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     @Generated(event = EventType.INSERT)
     private OffsetDateTime createdAt;

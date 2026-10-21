@@ -6,6 +6,7 @@ import type {
   EmployeeSummary,
   EmployeeRole,
   EmploymentType,
+  ResetPasswordResult,
   TrainerLevel,
 } from '@/api/types-cde'
 
@@ -58,5 +59,18 @@ export function useUpdateEmployeeAccount() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'employees'] })
     },
+  })
+}
+
+/**
+ * Đặt lại mật khẩu cho một tài khoản bất kỳ, tìm theo số điện thoại — dùng cho
+ * cả nhân viên lẫn hội viên, không chỉ 4 vai trò nhân sự. Không có query liên
+ * quan để invalidate vì không có danh sách hội viên nào trong web hiển thị
+ * trạng thái khóa tài khoản.
+ */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (phone: string) =>
+      api.post<ResetPasswordResult>('/admin/employees/reset-mat-khau', { phone }),
   })
 }

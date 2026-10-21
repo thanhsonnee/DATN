@@ -87,4 +87,17 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
          + "WHERE r.status = com.gym.membership.domain.RegistrationStatus.ACTIVE "
          + "  AND r.deletedAt IS NULL")
     long countDistinctActiveMembers();
+
+    /**
+     * Hợp đồng do nhân viên phòng Sales chốt trong khoảng ngày — cho màn Admin xem
+     * "Sale nào chốt hợp đồng nào" ở CRM. CHỈ bắt được hợp đồng tạo tại quầy có
+     * {@code soldBy} là người thuộc phòng Sales — bỏ sót hợp đồng tự mua online
+     * (soldBy luôn null) và hợp đồng Lễ tân tạo hộ dù Sale đã chăm sóc lead trước
+     * đó (chưa có cơ chế gán lại theo Lead.assignedTo).
+     */
+    @Query("SELECT r FROM Registration r "
+         + "WHERE r.deletedAt IS NULL AND r.contractDate BETWEEN :tu AND :den "
+         + "  AND r.soldBy IS NOT NULL AND r.soldBy.department = com.gym.identity.domain.Department.SALES "
+         + "ORDER BY r.contractDate DESC")
+    List<Registration> timHopDongDoSaleChot(@Param("tu") LocalDate tu, @Param("den") LocalDate den);
 }

@@ -111,7 +111,7 @@ const NHAN_VIEN: UserRole[] = ['ADMIN', 'SALE', 'RECEPTIONIST', 'ACCOUNTANT']
 
 export const laNhanVien = (role?: UserRole) => !!role && NHAN_VIEN.includes(role)
 
-/** Trang chính của từng vai trò — dùng sau khi đăng nhập và cho logo/"Fitness Center". */
+/** Trang chính của từng vai trò — dùng sau khi đăng nhập và cho logo/"FitZone Gym". */
 export function trangChinhCuaVaiTro(role?: UserRole): string {
   switch (role) {
     case 'ADMIN': return '/quan-tri'

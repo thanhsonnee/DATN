@@ -143,6 +143,11 @@ public class LeadService {
         if (req.stage() == LeadStage.LOST) {
             throw ApiException.badRequest("USE_MARK_LOST", "Vui lòng dùng chức năng Đánh dấu thất bại để ghi rõ lý do");
         }
+        if (req.stage() == LeadStage.WON) {
+            throw ApiException.badRequest("WON_IS_AUTOMATIC",
+                    "Không tự đánh dấu \"Đã mua gói\" được — trạng thái này chỉ tự chuyển khi hệ thống "
+                  + "thật sự tạo hợp đồng cho khách (xem markWonByPersonId)");
+        }
 
         User actor = actorUserId != null ? userRepo.findById(actorUserId).orElse(null) : null;
         tuGanChoSaleNeuChuaCoAi(lead, actor);
@@ -251,6 +256,19 @@ public class LeadService {
             leadRepo.save(l);
             log.info("Tự động chuyển Lead #{} của personId={} sang WON", l.getId(), personId);
         }
+    }
+
+    /**
+     * Sale đang/đã phụ trách khách này — dùng để {@link RegistrationService} gán
+     * {@code soldBy} cho hợp đồng đúng người tư vấn, bất kể ai là người thao tác tạo
+     * hợp đồng (Lễ tân tạo hộ, hoặc khách tự mua online sau khi đã được Sale tư vấn
+     * trước đó). {@code empty} nếu khách chưa từng có Lead nào được phân công Sale.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Employee> saleDangPhuTrach(Long personId) {
+        if (personId == null) return Optional.empty();
+        return leadRepo.findFirstByPersonIdAndAssignedToIsNotNullAndDeletedAtIsNullOrderByIdDesc(personId)
+                .map(Lead::getAssignedTo);
     }
 
     /**
