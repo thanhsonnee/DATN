@@ -21,6 +21,14 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     List<Lead> findByPersonIdAndStageNotInAndDeletedAtIsNull(Long personId, List<LeadStage> closedStages);
 
+    /**
+     * Lead gần nhất của người này đã từng có Sale phụ trách — dùng để gán {@code soldBy}
+     * cho hợp đồng dù ai là người thao tác tạo hợp đồng (Lễ tân tạo hộ, hoặc khách tự
+     * mua online sau khi đã được Sale tư vấn). Không giới hạn theo stage: kể cả Lead
+     * đã WON/LOST vẫn tính, vì công tư vấn là việc đã xảy ra, không mất đi theo stage.
+     */
+    java.util.Optional<Lead> findFirstByPersonIdAndAssignedToIsNotNullAndDeletedAtIsNullOrderByIdDesc(Long personId);
+
     @Query("SELECT l.stage, COUNT(l) FROM Lead l WHERE l.deletedAt IS NULL GROUP BY l.stage")
     List<Object[]> countByStage();
 

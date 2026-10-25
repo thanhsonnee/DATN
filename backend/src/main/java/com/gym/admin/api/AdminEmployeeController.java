@@ -3,6 +3,8 @@ package com.gym.admin.api;
 import com.gym.admin.api.dto.CreateEmployeeAccountRequest;
 import com.gym.admin.api.dto.EmployeeAccountResponse;
 import com.gym.admin.api.dto.EmployeeSummaryResponse;
+import com.gym.admin.api.dto.ResetPasswordRequest;
+import com.gym.admin.api.dto.ResetPasswordResponse;
 import com.gym.admin.api.dto.UpdateEmployeeRequest;
 import com.gym.admin.service.AdminEmployeeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,5 +52,17 @@ public class AdminEmployeeController {
     public EmployeeSummaryResponse suaNhanVien(@PathVariable Long id,
                                                 @Valid @RequestBody UpdateEmployeeRequest req) {
         return service.capNhatNhanVien(id, req);
+    }
+
+    @Operation(summary = "Đặt lại mật khẩu tài khoản (mọi vai trò)",
+            description = "Dùng khi tài khoản quên mật khẩu hoặc bị khóa tạm do nhập sai nhiều "
+                        + "lần, chưa có luồng tự phục vụ qua email. Tìm theo số điện thoại — áp "
+                        + "dụng cho cả nhân viên lẫn hội viên, không chỉ 4 vai trò nhân sự. Sinh "
+                        + "mật khẩu tạm mới, trả về ĐÚNG MỘT LẦN, đồng thời xóa mọi trạng thái "
+                        + "khóa tạm/khóa thủ công.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/reset-mat-khau")
+    public ResetPasswordResponse datLaiMatKhau(@Valid @RequestBody ResetPasswordRequest req) {
+        return service.datLaiMatKhauTheoSdt(req.phone());
     }
 }

@@ -10,6 +10,7 @@ import {
   useFunnelStats,
 } from '@/hooks/useLeads'
 import { useMemberships } from '@/hooks/useMemberships'
+import { useSalesClosedThisMonth } from '@/hooks/useRegistrations'
 import { useAuth } from '@/stores/auth'
 import { HopThoaiTaoLead } from '@/components/HopThoaiTaoLead'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -20,7 +21,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
-import { tien } from '@/lib/format'
+import { tien, ngay } from '@/lib/format'
 import { ngayGio } from '@/lib/format-cde'
 import type { Lead, LeadSource, LeadStage, LostReason } from '@/api/types-cde'
 
@@ -76,6 +77,9 @@ export function BanHangPage() {
         </div>
       </div>
 
+      {/* Chỉ Admin thấy — hợp đồng do Sales chốt trong tháng, phục vụ theo dõi hiệu suất đội Sale. */}
+      {user?.role === 'ADMIN' && <KhuVucHopDongDoSaleChot />}
+
       {/* Việc cần làm hôm nay — quan trọng hơn phễu tổng quan, nên đặt trên cùng, luôn hiện. */}
       <BangCanLienHeHomNay
         leads={leadsCanLienHeHomNay}
@@ -113,7 +117,7 @@ export function BanHangPage() {
           onClick={() => setFilterStage(filterStage === 'TRIAL_DONE' ? 'ALL' : 'TRIAL_DONE')}
         />
         <FunnelCard
-          title="5. Đã chốt (WON)"
+          title="5. Đã mua gói (WON)"
           count={stats?.stageCounts?.['WON'] ?? 0}
           tone="green"
           active={filterStage === 'WON'}
@@ -400,6 +404,105 @@ export function BanHangPage() {
 }
 
 /**
+ * Chỉ Admin thấy — hợp đồng do từng Sale chốt trong 1 tháng, gộp theo người chốt.
+ *
+ * LƯU Ý quan trọng: chỉ bắt được hợp đồng tạo TẠI QUẦY bởi người thuộc phòng
+ * Sales (field `soldBy`) — không bắt được hợp đồng khách tự mua online hay hợp
+ * đồng Lễ tân tạo hộ dù Sale đã chăm sóc lead trước đó. Xem ghi chú ở
+ * `RegistrationRepository.timHopDongDoSaleChot`.
+ */
+function KhuVucHopDongDoSaleChot() {
+  const today = new Date()
+  const [month, setMonth] = useState(today.getMonth() + 1)
+  const [year, setYear] = useState(today.getFullYear())
+
+  const { data: hopDong, isLoading } = useSalesClosedThisMonth(month, year)
+
+  const theoSale = useMemo(() => {
+    const nhom = new Map<string, { ten: string; soHopDong: number; tongTien: number }>()
+    for (const r of hopDong ?? []) {
+      const key = r.soldByName ?? '—'
+      const hien = nhom.get(key) ?? { ten: key, soHopDong: 0, tongTien: 0 }
+      hien.soHopDong += 1
+      hien.tongTien += r.finalPrice
+      nhom.set(key, hien)
+    }
+    return [...nhom.values()].sort((a, b) => b.tongTien - a.tongTien)
+  }, [hopDong])
+
+  return (
+    <Card className="border-brand-300 bg-brand-50/40">
+      <CardHeader
+        title="Hợp đồng do Sale chốt trong tháng"
+        subtitle="Chỉ tính hợp đồng tạo tại quầy bởi nhân viên phòng Sales — bỏ sót đơn khách tự mua online hoặc Lễ tân tạo hộ"
+        action={<Badge tone="blue">{hopDong?.length ?? 0} hợp đồng</Badge>}
+      />
+      <CardBody className="space-y-4">
+        <div className="flex items-center gap-3">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>Tháng {m}</option>
+            ))}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
+            {[today.getFullYear() - 1, today.getFullYear(), today.getFullYear() + 1].map((y) => (
+              <option key={y} value={y}>Năm {y}</option>
+            ))}
+          </select>
+        </div>
+
+        {isLoading ? (
+          <Spinner />
+        ) : !hopDong || hopDong.length === 0 ? (
+          <EmptyState title="Chưa có hợp đồng nào do Sale chốt trong tháng này" />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {theoSale.map((s) => (
+                <div key={s.ten} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-900">{s.ten}</p>
+                  <p className="mt-1 text-xs text-slate-500">{s.soHopDong} hợp đồng</p>
+                  <p className="mt-1 text-lg font-bold text-brand-700">{tien(s.tongTien)}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-white text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2">Hợp đồng</th>
+                    <th className="px-4 py-2">Hội viên</th>
+                    <th className="px-4 py-2">Gói</th>
+                    <th className="px-4 py-2">Sale chốt</th>
+                    <th className="px-4 py-2 text-right">Giá trị</th>
+                    <th className="px-4 py-2">Ngày chốt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {hopDong.map((r) => (
+                    <tr key={r.id}>
+                      <td className="px-4 py-2 font-mono text-xs text-slate-600">{r.registrationCode}</td>
+                      <td className="px-4 py-2 font-medium text-slate-800">{r.memberName}</td>
+                      <td className="px-4 py-2 text-slate-600">{r.membershipName}</td>
+                      <td className="px-4 py-2 text-slate-800">{r.soldByName ?? '—'}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-slate-900">{tien(r.finalPrice)}</td>
+                      <td className="px-4 py-2 text-xs text-slate-500">{ngay(r.contractDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </CardBody>
+    </Card>
+  )
+}
+
+/**
  * Việc cần làm hôm nay của Sale: lead còn mở (chưa WON/LOST) có hẹn gọi lại
  * đã đến hoặc quá hạn. Luôn hiển thị trực tiếp (không phải bộ lọc ẩn/hiện) vì
  * đây là ưu tiên hàng đầu của Sale, quan trọng hơn cả tổng quan phễu bên dưới.
@@ -546,7 +649,6 @@ function HopThoaiChamSocLead({ lead, onClose }: { lead: Lead; onClose: () => voi
             <option value="CONTACTED">2. Đã liên hệ / Đang tư vấn (CONTACTED)</option>
             <option value="TRIAL_BOOKED">3. Đã hẹn lịch tập thử (TRIAL_BOOKED)</option>
             <option value="TRIAL_DONE">4. Khách đã đến tập thử xong (TRIAL_DONE)</option>
-            <option value="WON">5. Chốt mua gói thành công (WON)</option>
           </select>
         </div>
 
@@ -760,7 +862,7 @@ function tenStage(st: LeadStage) {
     case 'CONTACTED': return '2. Đã liên hệ'
     case 'TRIAL_BOOKED': return '3. Hẹn tập thử'
     case 'TRIAL_DONE': return '4. Đã tập thử'
-    case 'WON': return '5. Đã chốt'
+    case 'WON': return '5. Đã mua gói'
     case 'LOST': return '6. Mất khách'
     default: return st
   }

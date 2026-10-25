@@ -8,6 +8,7 @@ import type {
   ExpenseCategory,
   ProfitLossReport,
   PaymentMethod,
+  DailyRevenue,
 } from '@/api/types-cde'
 
 // =============================================================================
@@ -19,16 +20,6 @@ export function useRevenueReport(month: number, year: number) {
     queryKey: ['finance', 'revenue-report', month, year],
     queryFn: () =>
       api.get<RevenueReport>(`/finance/revenue/report?month=${month}&year=${year}`),
-  })
-}
-
-export function useScanRevenue() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: () => api.post<number>('/finance/revenue/scan-recognized', {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['finance', 'revenue-report'] })
-    },
   })
 }
 
@@ -185,5 +176,28 @@ export function useProfitLossReport(month: number, year: number) {
     queryKey: ['finance', 'profit-loss', month, year],
     queryFn: () =>
       api.get<ProfitLossReport>(`/finance/profit-loss?month=${month}&year=${year}`),
+  })
+}
+
+// =============================================================================
+// E6: Đối soát doanh thu theo ngày — minh bạch dòng tiền Lễ tân ↔ Kế toán
+// =============================================================================
+
+/** `date` dạng YYYY-MM-DD, bỏ trống = hôm nay. */
+export function useDailyRevenue(date?: string) {
+  return useQuery({
+    queryKey: ['finance', 'daily-revenue', date ?? null],
+    queryFn: () => api.get<DailyRevenue>(`/finance/daily-revenue${date ? `?date=${date}` : ''}`),
+  })
+}
+
+/** Kế toán/Admin xác nhận gộp 1 lần cho cả ngày — không duyệt từng dòng. */
+export function useConfirmDailyRevenue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (date: string) => api.post<DailyRevenue>(`/finance/daily-revenue/${date}/confirm`),
+    onSuccess: (_, date) => {
+      qc.invalidateQueries({ queryKey: ['finance', 'daily-revenue', date] })
+    },
   })
 }

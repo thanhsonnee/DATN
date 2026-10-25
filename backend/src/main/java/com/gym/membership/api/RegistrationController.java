@@ -111,6 +111,18 @@ public class RegistrationController {
         return registrationService.expiringWithin(days);
     }
 
+    @Operation(summary = "Hợp đồng do Sales chốt trong tháng",
+            description = "Cho Admin xem trên màn CRM: hợp đồng nào do Sale nào chốt trong 1 tháng. "
+                        + "Bỏ trống month/year = tháng hiện tại. LƯU Ý: chỉ bắt được hợp đồng tạo tại "
+                        + "quầy có người chốt thuộc phòng Sales — bỏ sót hợp đồng khách tự mua online "
+                        + "và hợp đồng Lễ tân tạo hộ dù Sale đã chăm sóc lead trước đó.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/sales-closed")
+    public List<RegistrationResponse> hopDongDoSaleChot(@RequestParam(required = false) Integer month,
+                                                          @RequestParam(required = false) Integer year) {
+        return registrationService.hopDongDoSaleChotTrongThang(month, year);
+    }
+
     @Operation(summary = "Quét xử lý hợp đồng hết hạn (A5)",
             description = "Chuyển các hợp đồng ACTIVE có endDate < hôm nay sang COMPLETED và thu hồi buổi PT còn dư.")
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST','SALE')")

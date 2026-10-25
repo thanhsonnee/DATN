@@ -29,6 +29,9 @@ public record RegistrationResponse(
         LocalDate endDate,
         OffsetDateTime activatedAt,
         String status,
+        /** Nhân viên chốt hợp đồng tại quầy — null nếu khách tự mua online. */
+        Long soldById,
+        String soldByName,
         Freeze freeze,
         /** Hợp đồng cùng loại gói được nối tiếp (tự động hoặc gia hạn thủ công). {@code null} nếu đây là gói độc lập. */
         Long renewFromRegistrationId,
@@ -54,6 +57,7 @@ public record RegistrationResponse(
                 r.getFreezeStatus().name());
 
         Registration renewFrom = r.getRenewFrom();
+        var soldBy = r.getSoldBy();
 
         return new RegistrationResponse(
                 r.getId(), r.getRegistrationCode(),
@@ -64,7 +68,10 @@ public record RegistrationResponse(
                 r.getMembership().getMaxFreezeDays(),
                 r.getListPrice(), r.getDiscountAmount(), r.getDiscountReason(), r.getFinalPrice(),
                 r.getContractDate(), r.getStartDate(), r.getEndDate(), r.getActivatedAt(),
-                r.getStatus().name(), freeze,
+                r.getStatus().name(),
+                soldBy == null ? null : soldBy.getId(),
+                soldBy == null ? null : soldBy.getPerson().getFullName(),
+                freeze,
                 renewFrom == null ? null : renewFrom.getId(),
                 renewFrom == null ? null : renewFrom.getRegistrationCode(),
                 renewFrom == null ? null : renewFrom.getEndDate());

@@ -1,5 +1,7 @@
 /** Kiểu dữ liệu cho module buổi tập, thanh toán và check-in. */
 
+import type { UserRole } from './types'
+
 // ------------------------------------------------------------ buổi tập PT
 
 export type SessionStatus =
@@ -319,6 +321,32 @@ export interface Expense {
   createdAt: string
 }
 
+// E6: Đối soát doanh thu theo ngày
+
+export interface PaymentLine {
+  id: number
+  paymentNo: string
+  paymentType: 'PAYMENT' | 'REFUND'
+  method: PaymentMethod
+  /** Dương là thu vào, âm là hoàn trả. */
+  amount: number
+  memberName: string
+  registrationCode: string
+  invoiceNo: string
+  receivedByName: string | null
+  paidAt: string
+  daXacNhan: boolean
+}
+
+export interface DailyRevenue {
+  date: string
+  totalAmount: number
+  confirmedAmount: number
+  pendingAmount: number
+  daXacNhanDuDoanhThuTrongNgay: boolean
+  lines: PaymentLine[]
+}
+
 export interface ProfitLossReport {
   month: number
   year: number
@@ -455,6 +483,16 @@ export interface EmployeeSummary {
   status: EmployeeStatus
   startDate: string
   baseSalary: number
+}
+
+/** Kết quả đặt lại mật khẩu — áp dụng cho mọi vai trò, không chỉ 4 vai trò nhân sự. */
+export interface ResetPasswordResult {
+  userId: number
+  username: string
+  fullName: string
+  role: UserRole
+  /** Chỉ có trong response NÀY — không xem lại được sau khi rời trang. */
+  tempPassword: string
 }
 
 export interface AdminMembersOverview {

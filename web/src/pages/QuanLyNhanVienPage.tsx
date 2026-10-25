@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useEmployeeAccounts, useCreateEmployeeAccount, useUpdateEmployeeAccount } from '@/hooks/useAdmin'
+import {
+  useEmployeeAccounts, useCreateEmployeeAccount, useUpdateEmployeeAccount, useResetPassword,
+} from '@/hooks/useAdmin'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -9,7 +11,9 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState, Spinner } from '@/components/ui/Spinner'
 import { ApiError } from '@/api/client'
 import { ngay, tien } from '@/lib/format'
-import type { EmployeeAccount, EmployeeRole, EmployeeSummary, EmploymentType, TrainerLevel } from '@/api/types-cde'
+import type {
+  EmployeeAccount, EmployeeRole, EmployeeSummary, EmploymentType, ResetPasswordResult, TrainerLevel,
+} from '@/api/types-cde'
 
 const TEN_VAI_TRO: Record<EmployeeRole, string> = {
   TRAINER: 'Huấn luyện viên',
@@ -30,6 +34,13 @@ const TEN_PHONG_BAN: Record<string, string> = {
   FRONT_DESK: 'Lễ tân',
   ACCOUNTING: 'Kế toán',
   MANAGEMENT: 'Quản lý',
+}
+
+/** Đủ 6 vai trò — khác {@link TEN_VAI_TRO} chỉ có 4 vai trò tạo được qua màn này. */
+const TEN_VAI_TRO_DAY_DU: Record<string, string> = {
+  ...TEN_VAI_TRO,
+  ADMIN: 'Quản trị viên',
+  MEMBER: 'Hội viên',
 }
 
 /**
@@ -53,6 +64,8 @@ export function QuanLyNhanVienPage() {
         </div>
         <Button onClick={() => setOpenCreate(true)}>+ Tạo tài khoản nhân viên</Button>
       </div>
+
+      <DatLaiMatKhau />
 
       <Card>
         <CardHeader title="Danh sách nhân viên đã có tài khoản" />
@@ -335,6 +348,108 @@ function HopThoaiMatKhauTam({ taiKhoan, onClose }: {
             {daSaoChep ? 'Đã sao chép ✓' : 'Sao chép mật khẩu'}
           </Button>
           <Button onClick={onClose}>Đã báo cho nhân viên, đóng lại</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/**
+ * Đặt lại mật khẩu cho MỘT TÀI KHOẢN BẤT KỲ, tìm theo số điện thoại — áp dụng
+ * cho cả hội viên lẫn nhân viên, không chỉ 4 vai trò ở danh sách bên dưới.
+ * Dùng khi tài khoản quên mật khẩu hoặc bị khóa tạm do nhập sai nhiều lần,
+ * chưa có cách tự lấy lại (hệ thống chưa có luồng "quên mật khẩu" qua email).
+ */
+function DatLaiMatKhau() {
+  const resetPassword = useResetPassword()
+  const [phone, setPhone] = useState('')
+  const [ketQua, setKetQua] = useState<ResetPasswordResult | null>(null)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!phone.trim()) return
+    resetPassword.mutate(phone.trim(), {
+      onSuccess: (kq) => {
+        setKetQua(kq)
+        setPhone('')
+      },
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Đặt lại mật khẩu tài khoản"
+                  subtitle="Dùng khi hội viên/nhân viên quên mật khẩu" />
+      <CardBody>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <Input label="Số điện thoại tài khoản" value={phone}
+                   onChange={(e) => setPhone(e.target.value)}
+                   placeholder="0912345678" required />
+          </div>
+          <Button type="submit" loading={resetPassword.isPending}>Đặt lại mật khẩu</Button>
+        </form>
+
+        {resetPassword.isError && (
+          <div className="mt-3">
+            <Alert tone="error">
+              {resetPassword.error instanceof ApiError
+                ? resetPassword.error.message
+                : 'Không đặt lại được mật khẩu, vui lòng thử lại'}
+            </Alert>
+          </div>
+        )}
+      </CardBody>
+
+      <HopThoaiKetQuaResetMatKhau ketQua={ketQua} onClose={() => setKetQua(null)} />
+    </Card>
+  )
+}
+
+/** Hiện mật khẩu tạm ĐÚNG MỘT LẦN — đóng lại là mất, không xem lại được. */
+function HopThoaiKetQuaResetMatKhau({ ketQua, onClose }: {
+  ketQua: ResetPasswordResult | null
+  onClose: () => void
+}) {
+  const [daSaoChep, setDaSaoChep] = useState(false)
+
+  if (!ketQua) return null
+
+  const saoChep = async () => {
+    try {
+      await navigator.clipboard.writeText(ketQua.tempPassword)
+      setDaSaoChep(true)
+    } catch {
+      /* trình duyệt chặn clipboard — người dùng tự đọc và gõ lại */
+    }
+  }
+
+  return (
+    <Modal open={!!ketQua} title="Đã đặt lại mật khẩu" onClose={onClose}>
+      <div className="space-y-4">
+        <Alert tone="success">
+          Đã đặt lại mật khẩu cho <strong>{ketQua.fullName}</strong>{' '}
+          ({TEN_VAI_TRO_DAY_DU[ketQua.role] ?? ketQua.role}), đồng thời mở mọi khóa tạm/khóa thủ công
+          trên tài khoản này.
+        </Alert>
+
+        <Alert tone="error">
+          Mật khẩu bên dưới chỉ hiển thị <strong>đúng một lần</strong>. Đóng cửa sổ này là mất, không xem
+          lại được — hãy báo ngay cho chủ tài khoản (nhắn tin/gặp trực tiếp), không gửi qua kênh nào khác.
+        </Alert>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs text-slate-500">Tên đăng nhập</p>
+          <p className="font-mono text-lg font-semibold text-slate-900">{ketQua.username}</p>
+          <p className="mt-3 text-xs text-slate-500">Mật khẩu tạm</p>
+          <p className="font-mono text-lg font-semibold text-slate-900">{ketQua.tempPassword}</p>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={saoChep}>
+            {daSaoChep ? 'Đã sao chép ✓' : 'Sao chép mật khẩu'}
+          </Button>
+          <Button onClick={onClose}>Đã báo cho chủ tài khoản, đóng lại</Button>
         </div>
       </div>
     </Modal>

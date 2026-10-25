@@ -417,6 +417,23 @@ public class RegistrationService {
     }
 
     /**
+     * Hợp đồng do nhân viên Sales chốt trong một tháng — cho Admin xem ai chốt được
+     * gì trên màn CRM. Bỏ trống {@code month}/{@code year} = tháng hiện tại.
+     */
+    @Transactional(readOnly = true)
+    public List<RegistrationResponse> hopDongDoSaleChotTrongThang(Integer month, Integer year) {
+        LocalDate today = LocalDate.now();
+        LocalDate dauThang = LocalDate.of(
+                year != null ? year : today.getYear(),
+                month != null ? month : today.getMonthValue(),
+                1);
+        LocalDate cuoiThang = dauThang.withDayOfMonth(dauThang.lengthOfMonth());
+
+        return registrationRepo.timHopDongDoSaleChot(dauThang, cuoiThang)
+                .stream().map(RegistrationResponse::from).toList();
+    }
+
+    /**
      * Tự động xử lý hết hạn cho các hợp đồng đã qua ngày kết thúc (A5).
      *
      * <p>Chuyển trạng thái ACTIVE → COMPLETED, thu hồi các buổi tập PT chưa dùng vào sổ cái.
@@ -562,12 +579,23 @@ public class RegistrationService {
             r.setAssignedTrainer(trainer);
         }
 
-        // Nhân viên bán hàng: ghi lại để tính hoa hồng. Hội viên tự mua thì để trống.
-        User actor = userRepo.findById(actorUserId).orElse(null);
-        if (actor != null && actor.getPrimaryRole() != UserRole.MEMBER) {
-            employeeRepo.findByPersonIdAndDeletedAtIsNull(actor.getPerson().getId())
-                    .ifPresent(r::setSoldBy);
+        // Nhân viên bán hàng: ưu tiên Sale đang/đã phụ trách lead của khách này (nếu
+        // có) — khách có thể do Lễ tân tạo hộ hoặc tự mua online sau khi đã được Sale
+        // tư vấn trước đó, công vẫn phải tính cho đúng Sale đó chứ không phải người
+        // thao tác tạo hợp đồng. Chỉ khi khách chưa từng có Sale phụ trách mới ghi
+        // nhận người đang thao tác (lễ tân/sale/admin tại quầy); hội viên tự mua và
+        // chưa từng có Lead nào thì để trống.
+        LeadService leadService = leadServiceProvider.getIfAvailable();
+        Employee soldBy = leadService != null
+                ? leadService.saleDangPhuTrach(member.getPerson().getId()).orElse(null)
+                : null;
+        if (soldBy == null) {
+            User actor = userRepo.findById(actorUserId).orElse(null);
+            if (actor != null && actor.getPrimaryRole() != UserRole.MEMBER) {
+                soldBy = employeeRepo.findByPersonIdAndDeletedAtIsNull(actor.getPerson().getId()).orElse(null);
+            }
         }
+        r.setSoldBy(soldBy);
 
         return r;
     }
