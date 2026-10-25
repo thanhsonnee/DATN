@@ -35,14 +35,6 @@ public class FinanceController {
     // E3: Ghi nhận doanh thu dồn tích (Revenue Recognition)
     // =========================================================================
 
-    @Operation(summary = "Quét ghi nhận doanh thu đến hạn")
-    @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
-    @PostMapping("/revenue/scan-recognized")
-    public ResponseEntity<Integer> scanRecognized() {
-        int count = revenueService.scanAndRecognize();
-        return ResponseEntity.ok(count);
-    }
-
     @Operation(summary = "Báo cáo đối chiếu Doanh thu thực thu (Cash) vs Dồn tích (Accrual)")
     @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
     @GetMapping("/revenue/report")

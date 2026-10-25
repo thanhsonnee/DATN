@@ -23,16 +23,6 @@ export function useRevenueReport(month: number, year: number) {
   })
 }
 
-export function useScanRevenue() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: () => api.post<number>('/finance/revenue/scan-recognized', {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['finance', 'revenue-report'] })
-    },
-  })
-}
-
 // =============================================================================
 // E4: Bảng lương (Payroll Runs)
 // =============================================================================

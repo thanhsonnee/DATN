@@ -3,7 +3,7 @@ import {
   useCaHienTai, useCongNo, useDongCa, useKhoanThu, useMoCa, useThuTien,
 } from '@/hooks/useBilling'
 import {
-  useRevenueReport, useScanRevenue,
+  useRevenueReport,
   usePayrollRuns, usePayrollDetail, useCalculatePayroll, useUpdatePayrollItem, useApprovePayroll, usePayPayroll,
   useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useProfitLossReport,
   useDailyRevenue, useConfirmDailyRevenue,
@@ -552,43 +552,32 @@ function TabDoanhThuDonTich() {
   const [year, setYear] = useState(today.getFullYear())
 
   const { data: report, isLoading } = useRevenueReport(month, year)
-  const scanRevenue = useScanRevenue()
 
   if (isLoading) return <Spinner />
 
   return (
     <div className="space-y-6">
-      {/* Bộ lọc tháng/năm và Nút quét nhận doanh thu */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-slate-700">Kỳ báo cáo:</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>Tháng {m}</option>
-            ))}
-          </select>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          >
-            {CAC_NAM_CHON.map((y) => (
-              <option key={y} value={y}>Năm {y}</option>
-            ))}
-          </select>
-        </div>
-
-        <Button
-          variant="secondary"
-          loading={scanRevenue.isPending}
-          onClick={() => scanRevenue.mutate()}
+      {/* Bộ lọc tháng/năm */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-slate-700">Kỳ báo cáo:</label>
+        <select
+          value={month}
+          onChange={(e) => setMonth(Number(e.target.value))}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
         >
-          ⚡ Quét nhận doanh thu đến hạn
-        </Button>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <option key={m} value={m}>Tháng {m}</option>
+          ))}
+        </select>
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+        >
+          {CAC_NAM_CHON.map((y) => (
+            <option key={y} value={y}>Năm {y}</option>
+          ))}
+        </select>
       </div>
 
       {/* Thẻ chỉ số tổng quan E3 */}
