@@ -1557,7 +1557,7 @@ WHERE COALESCE(e.s, 0) <> rs.recognized_amount;
 | 2 | **`refresh_tokens`** — kế hoạch 31 bảng đưa sang Redis, nhưng giờ đã có `password_reset_tokens` là bảng. Có nên đưa `refresh_tokens` về CSDL cho nhất quán? *(→ 33 bảng)* | ⏳ **Cần bạn xác nhận** |
 | 3 | Viết lại `schema.sql` theo 32 bảng | Chưa làm |
 | 4 | Cập nhật `00-TONG-QUAN-BANG.sql` | Chưa làm |
-| 5 | Cập nhật `docs/03-CO-SO-DU-LIEU.md` (sơ đồ nhóm, migration) | Chưa làm |
+| 5 | ~~Cập nhật `docs/03-CO-SO-DU-LIEU.md` (sơ đồ nhóm, migration)~~ | Bỏ — thư mục `docs/` đã xóa |
 | 6 | Vẽ lại ERD | Chưa làm |
 
 ### Về mục 2 — lập luận cho việc đưa `refresh_tokens` về CSDL

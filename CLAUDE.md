@@ -10,17 +10,13 @@ chung: `backend/` (Spring Boot API), `web/` (React, dùng bởi Admin/Sale/Lễ
 tân/Kế toán + trang công khai/hội viên), `mobile/` (Expo/React Native, hội viên
 + PT). Giao diện và code đều viết tiếng Việt (tên biến, route, trang).
 
-`docs/*.md` là tài liệu thiết kế/định hướng đồ án (kiến trúc lý tưởng, kế hoạch
-kiểm thử, đóng góp học thuật) — mô tả **ý định**, không phải lúc nào cũng khớp
-100% với code hiện tại (vd. doc nói Gradle nhưng backend dùng Maven; doc có
-module `finance`/`crm-sales`/`engagement` nhưng code đặt tên `billing`/`sales`/
-`feedback`). Khi có mâu thuẫn, code là nguồn sự thật.
+Repo không còn thư mục `docs/` (tài liệu thiết kế cũ đã bị xóa vì lỗi thời).
+Code là nguồn sự thật duy nhất về hiện trạng hệ thống.
 
 Cho câu hỏi về **kiến trúc/schema**, ưu tiên đọc `db/database_7_9_26.md` (đọc
-thẳng từ các file migration đã áp dụng, mô tả **hiện trạng thật**) thay vì
-`docs/*.md` (kế hoạch cũ, nhiều phần chưa triển khai). Đừng suy luận kiến trúc
-chỉ từ `docs/*.md` — luôn đối chiếu với code/migration thật trước khi đưa lời
-khuyên (vd. một dependency có trong `pom.xml`/`docker-compose.yml` không có
+thẳng từ các file migration đã áp dụng, mô tả **hiện trạng thật**). Đừng suy
+luận kiến trúc chỉ từ tài liệu — luôn đối chiếu với code/migration thật trước
+khi đưa lời khuyên (vd. một dependency có trong `pom.xml`/`docker-compose.yml` không có
 nghĩa là code thực sự dùng nó — `spring-boot-starter-data-redis` có khai báo
 nhưng không có code nào dùng thật, `/actuator/health` đã tắt health check
 Redis vì lý do này. Ngược lại, MinIO **có** dùng thật: `FileStorageService`
