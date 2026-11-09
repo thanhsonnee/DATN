@@ -1,5 +1,7 @@
 # TỪ ĐIỂN DỮ LIỆU — HIỆN TRẠNG THỰC TẾ (07/09/2026)
 
+> ⚠️ **Cập nhật sau ngày viết:** file này là ảnh chụp tại migration V19. Sau đó `V24` thêm `workout_plans` và `body_metrics` (khác với bản đề xuất Nhóm G bên dưới), rồi `V27` **xóa 5 bảng không dùng**: `workout_plans`, `body_metrics`, `member_trainers`, `audit_logs`, `password_reset_tokens`. Hiện còn **20 bảng nghiệp vụ**. Các mục về 5 bảng này bên dưới chỉ còn giá trị lịch sử.
+
 > **Nguồn duy nhất:** 19 file migration Flyway đã áp dụng (`V1__identity.sql` → `V19__system_settings.sql`).
 > `application.yml` đặt `ddl-auto: validate` — **Flyway là nguồn sự thật duy nhất của schema**, không suy từ entity Java. Vì vậy tài liệu này đọc thẳng từ SQL migration, không đọc từ `db/32_bang.md` (đó là bản **kế hoạch**, không phải hiện trạng).
 >

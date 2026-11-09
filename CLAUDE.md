@@ -156,16 +156,18 @@ không sửa migration đã chạy — thêm migration mới. `db/` ở gốc re
 tài liệu tham chiếu/ghi chú thiết kế, không phải nguồn migration thật.
 
 Trong `db/`, ưu tiên **`database_7_9_26.md`** khi cần biết schema hiện tại —
-file này đọc trực tiếp từ các migration đã áp dụng (23 bảng đang chạy) và tự
+file này đọc trực tiếp từ các migration đã áp dụng (23 bảng tại thời điểm viết) và tự
 đối chiếu với kế hoạch gốc để chỉ rõ phần nào **chưa triển khai** (lớp học
 nhóm, bài tập & chỉ số cơ thể, RFID/nhận diện khuôn mặt ở check-in, v.v.).
 `32_bang.md` chỉ là **kế hoạch gốc 32 bảng**, không phải hiện trạng — đừng
 dùng nó một mình để trả lời câu hỏi về schema thật.
 
 Lưu ý: file `database_7_9_26.md` là ảnh chụp tại một thời điểm (viết dựa trên
-migration tới V19) nên có thể **lùi sau vài migration** so với thư mục
-`db/migration/` thật (vd. tại thời điểm viết ghi chú này, migration mới nhất
-đã là V21 nhưng chưa tạo bảng mới nên số "23 bảng" vẫn đúng, chỉ lệch vài chi
-tiết cột/enum). Khi cần con số tuyệt đối mới nhất, đối chiếu thêm với
+migration tới V19) nên đã **lùi sau vài migration** so với thư mục
+`db/migration/` thật: V24 thêm `workout_plans`/`body_metrics`, rồi V27 xóa 5
+bảng không dùng (`workout_plans`, `body_metrics`, `member_trainers`,
+`audit_logs`, `password_reset_tokens`), nên hiện có **20 bảng nghiệp vụ**.
+File snapshot vẫn liệt kê các bảng đã xóa — coi đó là lịch sử. Khi cần con số
+tuyệt đối mới nhất, đối chiếu thêm với
 `ls backend/src/main/resources/db/migration/` thay vì tin tuyệt đối vào ngày
 trong tên file.
